@@ -4,6 +4,7 @@ library(sf)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(tidyverse)
 library(mpspline2)
 
 #Importation des couches ----
@@ -420,3 +421,4 @@ BDAT_pH <- BDAT_pH %>%
 
 #FUSION DES DEUX BASES
 base_final <- bind_rows(igcs_final_pH, BDAT_pH)
+write.csv(base_final, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/BDAT_IGCS_pH.csv", row.names = FALSE)
