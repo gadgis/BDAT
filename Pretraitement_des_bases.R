@@ -450,3 +450,4 @@ base_final <- base_final %>%
   filter(!is.na(pH))
 
 write.csv(base_final, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/BDAT_IGCS_pH.csv", row.names = FALSE)
+saveRDS(base_final, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat.rds")
