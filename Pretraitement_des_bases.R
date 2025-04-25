@@ -212,6 +212,7 @@ igcs_agri <- igcs %>%
   filter(id_prfl %in% igcs_agri_sf$id_prfl)%>%
   mutate(annee=as.factor(format(dt_cmp_, "%Y")))
 
+
 ##Harmonisation IGCS à 0-30 cm ----
 #renommer les colonnes
 
@@ -226,6 +227,11 @@ igcs_agri<-igcs_agri %>%
     SILT = limon )%>%
   st_transform(igcs_agri, crs=2154)
 
+#Recupération INSEE de IGCS
+igcs_agri<-igcs_agri %>%
+  st_join(com %>% select(INSEE_COM),
+          join = st_intersects)
+
 
 cds<- st_coordinates(igcs_agri)
 igcs_agri<-igcs_agri %>%
@@ -234,13 +240,6 @@ igcs_agri<-igcs_agri %>%
 
 summary(igcs_agri)
 
-###Filtrage des horizons sans limites définies----
-
-igcs_agri<-igcs_agri %>%
-  
-  filter(!is.na(prof_nf),
-         !is.na(prof_sp)
-  )
 
 ###transformation en dataframe
 igcs_agri_df <- igcs_agri %>% 
@@ -248,7 +247,23 @@ igcs_agri_df <- igcs_agri %>%
          top       = prof_sp,
          bottom    = prof_nf
   ) %>%
-  st_drop_geometry()
+  st_drop_geometry() %>% 
+mutate(
+  top = case_when(
+    !is.na(top)                 ~ top,          # 1) top déjà renseigné
+    is.na(top) & no_hrzn == 1   ~ 0,            # 2) premier horizon → 0 cm
+    TRUE                        ~ lag(bottom)   # 3) sinon = bottom du précédent
+  ))
+
+
+
+###Filtrage des horizons sans limites définies----
+
+igcs_agri_df<-igcs_agri_df %>%
+  
+  filter(!is.na(top),
+         !is.na(bottom)
+  )
 
 ###Filtrage des profils composite de RMQS---
 
@@ -256,6 +271,7 @@ igcs_agri_df <- igcs_agri %>%
 
 igcs_agri_df<-igcs_agri_df%>%
   filter( is.na(typ_pr_)) 
+
 
 ###Harmonisation des données sur le pH----
 
@@ -266,11 +282,15 @@ igcs_agri_pH<-igcs_agri_df%>%
     bottom,
     no_hrzn,
     annee,
+    INSEE_COM,
     x,
     y,
     pH
   ) %>%
   filter(!is.na(pH)) 
+
+# Harmonisation des horizons
+
 
 ####selection des profils à horizons uniques
 pf_uniq <- igcs_agri_pH %>% 
@@ -309,7 +329,7 @@ p_mp <- pf_mp %>%
   mutate(
     thick = bottom - top          # épaisseur cm
   ) %>% 
-  group_by(id_profil,annee,x,y) %>% 
+  group_by(id_profil,annee,INSEE_COM,x,y) %>% 
   summarise(
     pH = round(weighted.mean(pH, thick, na.rm = TRUE),1)   # moyenne pondérée
   ) %>% 
@@ -373,27 +393,29 @@ igcs_spline <- imap_dfr(spl_layers, ~ {
 
 igcs_spline <- igcs_spline %>%
   left_join(
-    spl_dfs %>% distinct(id_profil, annee, x, y),
+    spl_dfs %>% distinct(id_profil, INSEE_COM, annee, x, y),
     by = "id_profil"
   ) %>%
   rename(pH = pH_000_030_cm) %>%
-  select(id_profil, annee, x, y, pH)
+  select(id_profil, annee, INSEE_COM, x, y, pH)
 
 ##haromisation des colonnes
 pf_uniq <- pf_uniq %>%
-  select(id_profil, annee, x, y, pH)
+  select(id_profil, annee,INSEE_COM, x, y, pH)
+p_mp <- p_mp %>%
+  select(id_profil, annee,INSEE_COM, x, y, pH)
 
 p3hrzn1_30_35 <- p3hrzn1_30_35 %>%
-  select(id_profil, annee, x, y, pH)
+  select(id_profil, annee,INSEE_COM, x, y, pH)
 
 P2hrzn1_30_35 <- P2hrzn1_30_35 %>%
-  select(id_profil, annee, x, y, pH)
+  select(id_profil, annee,INSEE_COM, x, y, pH)
 
 igcs_final_pH<-rbind(p_mp, pf_uniq, p3hrzn1_30_35, igcs_spline, P2hrzn1_30_35)
 
 igcs_final_pH <- igcs_final_pH %>%
-  mutate(
-    source="IGCS"
+  mutate(source="IGCS",
+         INSEE_COM=as.numeric(INSEE_COM),
   )
 #Création de la base finale----
 
@@ -419,6 +441,12 @@ BDAT_pH <- BDAT_pH %>%
     pH = as.numeric(pH),
     annee=as.factor(annee))
 
+
+
 #FUSION DES DEUX BASES
+
 base_final <- bind_rows(igcs_final_pH, BDAT_pH)
+base_final <- base_final %>%
+  filter(!is.na(pH))
+
 write.csv(base_final, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/BDAT_IGCS_pH.csv", row.names = FALSE)
