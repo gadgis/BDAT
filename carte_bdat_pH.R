@@ -19,16 +19,14 @@ dpt <- st_read("Y:\\BDAT\\traitement_donnees\\MameGadiaga\\prétraitement\\data\
 d_pH<-read.csv("BDAT_IGCS_pH.csv", sep=",", header=TRUE)
 
 d_pH <- d_pH %>%
-  select(id_profil,annee,x,y,pH,source,bdatid,insee,codification)
+  select(id_profil,annee,x,y,pH,source,bdatid,insee, INSEE_COM,codification)
 
-#Jointure spatiale entre les points et la couche commune----
+#Transformation en sf----
 d_pH_sf<-st_as_sf(d_pH, coords = c("x", "y"), crs = 2154)
-
-d_pH_join <- st_join(d_pH_sf, communes, join = st_intersects)
 
 #Agrégation des propriétés par commune
 
-pH_com <- d_pH_join %>%
+pH_com <- d_pH_sf %>%
   group_by(INSEE_COM) %>%
   summarise(
     moy_ph = round(mean(pH, na.rm = TRUE), 1),
