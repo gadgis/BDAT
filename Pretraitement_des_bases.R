@@ -12,7 +12,7 @@ setwd("Y:/BDAT/traitement_donnees/MameGadiaga/prétraitement/Analyse/Codes_Mame/
 BDAT<-read.csv("bdat_53_x_y.csv", sep=",", header=TRUE)
 igcs<-st_read("Y:/BDAT/traitement_donnees/MameGadiaga/prétraitement/Analyse/Codes_Mame/Donnees/DonneesIGCSStage.shp")
 dpt <- st_read("Y:/BDAT/traitement_donnees/MameGadiaga/prétraitement/Analyse/Codes_Mame/Donnees/dept_53.shp")
-com <- st_read("Y:/BDAT/traitement_donnees/MameGadiaga/prétraitement/Analyse/Codes_Mame/Donnees/COMMUNE.SHP")
+com <- st_read("Y:\\BDAT\\traitement_donnees\\MameGadiaga\\prétraitement\\data\\communes53_2014.shp")
 ocsol<- st_read("Y:/BDAT/traitement_donnees/MameGadiaga/prétraitement/Analyse/Codes_Mame/Donnees/OCCUPATION_SOL.shp")
 nomenclature<-read.csv("NomenclatureOCSGE.csv", sep=";", header=TRUE)
 
