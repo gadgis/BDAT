@@ -35,7 +35,8 @@ pH_com <- d_pH_sf %>%
     n      = n()
   )
 
-
+pH_com_df<-pH_com %>%
+  st_drop_geometry()
 #Jointure de l'agrégation" aux communes
 
 mayenne_ph <- st_join(communes, pH_com, join = st_intersects)
@@ -73,3 +74,4 @@ ggplot() +
   theme_minimal() +
   labs(
     title = "pH moyen par commune" )
+saveRDS(pH_com_df, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/ph_moyen.rds")
