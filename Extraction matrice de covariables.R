@@ -4,10 +4,15 @@ library(terra)
 library(dplyr)
 library(randomForest)
 library(ranger)
+library(exactextractr)
+library(tmap)
 
 #Chargement des données----
 donnnees <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat.rds")
-ocsol<- st_read("Y:/BDAT/traitement_donnees/MameGadiaga/prétraitement/Analyse/Codes_Mame/Donnees/OCCUPATION_SOL.shp")
+ocsol<-vect("Y:/BDAT/traitement_donnees/MameGadiaga/prétraitement/Analyse/Codes_Mame/Donnees/OCCUPATION_SOL.shp")
+communes <- st_read("Y:\\BDAT\\traitement_donnees\\MameGadiaga\\prétraitement\\data\\communes53_2014.shp")
+ph_moyen<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/ph_moyen.rds")
+dept<- st_read("Y:\\BDAT\\traitement_donnees\\MameGadiaga\\prétraitement\\data\\dept53_rep.shp")
 
 #Extraction des matrices de covariables pour les données ponctuelles----
 
@@ -21,8 +26,59 @@ print(fichiers_cov)
 rasters_cov <- lapply(fichiers_cov, function(x) {
   rast(x)
 })
+print(rasters_cov)
 
-##Spécification du type de variable pour le re-échantillonnage----
+##Empilage des rasters----
+rst <- do.call(c, rasters_cov)
+
+
+##Définir un masque par la zone agricole----
+zone_agricole <- ocsol[ocsol$CODE_US == "US1.1", ]
+
+# Rasteriser cette zone agricole
+rast_za <- rasterize(zone_agricole, rst, field=1, background=NA)
+print(rast_za)
+
+##Appliction du masque au stack----
+rst_za <- mask(rst, rast_za)
+print(rst_za)
+
+##Extraction des valeurs de covariables pour les points----
+donnees_pH<-st_as_sf(donnnees, coords = c("x", "y"), crs = "2154")
+
+matrice_cov <- terra::extract(rst_za, donnees_pH)
+summary(matrice_cov)
+
+#Joindre les attributs des points avec les covariables extraites
+
+donnees_extraits <- cbind(as.data.frame(donnees_pH), matrice_cov)
+
+summary(donnees_extraits)
+
+#Sauvegarde de la matrice de covariables
+saveRDS(donnees_extraits, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/matrice_covariables.rds")
+
+#Extraction des matrices de covariables pour les centroides----
+
+##Création des centroides des communes----
+ph_moyen <- ph_moyen %>%
+  mutate(INSEE_COM = as.character(INSEE_COM)) 
+
+##Création des centroïdes avec gestion des types
+centroides <- communes %>%
+  st_centroid() %>%
+  select(INSEE_COM) %>%
+  mutate(INSEE_COM = as.character(INSEE_COM)) %>%  
+  left_join(ph_moyen, by = "INSEE_COM") %>%
+  mutate(
+    X = st_coordinates(.)[,1],  
+    Y = st_coordinates(.)[,2]   
+  ) %>%
+  select(INSEE_COM, X, Y, moy_ph)%>%
+  st_drop_geometry()
+
+##Extraction des valeurs----
+#définir le type de covariables
 types_covariables <- c(
   # bdforet 0-6 et 30-50 : CATEGORICAL
   rep("categorical", 10),
@@ -90,38 +146,59 @@ types_covariables <- c(
   # Ugamma : CONTINUOUS
   "continuous"
 )
+# Séparer les rasters continus et catégoriels
+rasters_continuous <- subset(rst_za, which(types_covariables == "continuous"))
+rasters_categorical <- subset(rst_za, which(types_covariables == "categorical"))
+print(rasters_continuous)
+print(rasters_categorical)
 
-##Définir une projection cible pour les raster
-projection_cible <- st_crs(ocsol)
-projection_cible_txt <- as.character(crs(ocsol))
-
-##Reprojetion des rasters----
-rasters_cov <- lapply(rasters_cov, function(r) {
-  if (as.character(crs(r)) != projection_cible_txt) {
-    project(r, projection_cible_txt)
+# Fonction mode (valeur la plus fréquente)
+mode_function <- function(values, coverage_fraction) {
+  values <- na.omit(values)
+  if (length(values) == 0) {
+    return(NA)
   } else {
-    r
+    return(as.numeric(names(which.max(table(values)))))
   }
-})
+}
 
-# # Tous les CRS sont-ils identiques ?
-# all(sapply(rasters_cov, function(r) as.character(crs(r)) == as.character(crs(ocsol))))
+# Extraire les moyennes des variables continues
+moyennes_cov <- exact_extract(rasters_continuous, communes,
+                              fun = function(values, coverage_fraction) mean(values, na.rm = TRUE),
+                              stack_apply = TRUE)
 
-##Re-échantillonnage des rasters----
+names(moyennes_cov) <- gsub("^fun\\.", "", names(moyennes_cov))
 
-#Création d'un modèle de raster à 90 m
-template_90m <- rast(ext(ocsol),
-                     resolution = 90,
-                     crs = projection_cible_txt)
+# Extraire les modes des variables catégorielles
+mode_cov <- exact_extract(rasters_categorical, communes,
+                              fun = mode_function,
+                              stack_apply = TRUE)
+names(mode_cov) <- gsub("^fun\\.", "", names(mode_cov))
 
-#re-échantillonnage au pas de 90 m
+#Fusionner les résultats
+df_covariables <- cbind(moyennes_cov, mode_cov)
+df_covariables <- df_covariables %>%
+  mutate(INSEE_COM = communes$INSEE_COM)
 
-rasters_cov90m <- mapply(function(r, type) {
-  methode <- ifelse(type == "continuous", "bilinear", "near")
-  resample(r, template_90m, method = methode)
-}, rasters_cov, types_covariables, SIMPLIFY = FALSE)
+#jointure avec les centroides
+centroides <- centroides %>%
+  left_join(df_covariables, by = "INSEE_COM")
 
-# Vérification de la résolution
-# Afficher la résolution de tous les rasters
-# lapply(rasters_cov90m, res)
+saveRDS(centroides, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/centroides_covariables.rds")
+
+
+#verification 
+tm_shape(zone_agricole) + 
+  tm_polygons(col = "green",        
+              alpha = 0.5,  
+              lwd = 0.1) +               
+  
+  tm_shape(dept) +
+  tm_borders(col = "black",            
+             lwd = 2) +               
+  
+  tm_shape(donnees_pH) + 
+  tm_dots(col = "red",                 
+          size = 0.09,                  
+          alpha = 0.8)
 
