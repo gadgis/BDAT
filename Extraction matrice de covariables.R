@@ -27,57 +27,8 @@ rasters_cov <- lapply(fichiers_cov, function(x) {
   rast(x)
 })
 print(rasters_cov)
+plot(rasters_cov[[]])
 
-##Empilage des rasters----
-rst <- do.call(c, rasters_cov)
-
-
-##Définir un masque par la zone agricole----
-zone_agricole <- ocsol[ocsol$CODE_US == "US1.1", ]
-
-# Rasteriser cette zone agricole
-rast_za <- rasterize(zone_agricole, rst, field=1, background=NA)
-print(rast_za)
-
-##Appliction du masque au stack----
-rst_za <- mask(rst, rast_za)
-print(rst_za)
-
-##Extraction des valeurs de covariables pour les points----
-donnees_pH<-st_as_sf(donnnees, coords = c("x", "y"), crs = "2154")
-
-matrice_cov <- terra::extract(rst_za, donnees_pH)
-summary(matrice_cov)
-
-#Joindre les attributs des points avec les covariables extraites
-
-donnees_extraits <- cbind(as.data.frame(donnees_pH), matrice_cov)
-
-summary(donnees_extraits)
-
-#Sauvegarde de la matrice de covariables
-saveRDS(donnees_extraits, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/matrice_covariables.rds")
-
-#Extraction des matrices de covariables pour les centroides----
-
-##Création des centroides des communes----
-ph_moyen <- ph_moyen %>%
-  mutate(INSEE_COM = as.character(INSEE_COM)) 
-
-##Création des centroïdes avec gestion des types
-centroides <- communes %>%
-  st_centroid() %>%
-  select(INSEE_COM) %>%
-  mutate(INSEE_COM = as.character(INSEE_COM)) %>%  
-  left_join(ph_moyen, by = "INSEE_COM") %>%
-  mutate(
-    X = st_coordinates(.)[,1],  
-    Y = st_coordinates(.)[,2]   
-  ) %>%
-  select(INSEE_COM, X, Y, moy_ph)%>%
-  st_drop_geometry()
-
-##Extraction des valeurs----
 #définir le type de covariables
 types_covariables <- c(
   # bdforet 0-6 et 30-50 : CATEGORICAL
@@ -151,6 +102,63 @@ rasters_continuous <- subset(rst_za, which(types_covariables == "continuous"))
 rasters_categorical <- subset(rst_za, which(types_covariables == "categorical"))
 print(rasters_continuous)
 print(rasters_categorical)
+
+##Empilage des rasters----
+rst <- do.call(c, rasters_cov)
+
+
+##Définir un masque par la zone agricole----
+zone_agricole <- ocsol[ocsol$CODE_US == "US1.1", ]
+
+# Rasteriser cette zone agricole
+rast_za <- rasterize(zone_agricole, rst, field=1, background=NA)
+print(rast_za)
+
+##Appliction du masque au stack----
+rst_za <- mask(rst, rast_za)
+print(rst_za)
+
+##Extraction des valeurs de covariables pour les points----
+donnees_pH<-st_as_sf(donnnees, coords = c("x", "y"), crs = "2154")
+
+# conversion en df du stack en zone agricole
+gXY <- as.data.frame(rst_za , xy=TRUE) %>%
+  mutate(No_UTS = as.factor(No_UTS)) %>%
+  na.omit( )
+
+
+matrice_cov <- terra::extract(rst, donnees_pH)
+summary(matrice_cov)
+
+#Joindre les attributs des points avec les covariables extraites
+
+donnees_extraits <- cbind(as.data.frame(donnees_pH), matrice_cov)
+
+summary(donnees_extraits)
+
+#Sauvegarde de la matrice de covariables
+saveRDS(donnees_extraits, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/matrice_covariables.rds")
+
+#Extraction des matrices de covariables pour les centroides----
+
+##Création des centroides des communes----
+ph_moyen <- ph_moyen %>%
+  mutate(INSEE_COM = as.character(INSEE_COM)) 
+
+##Création des centroïdes avec gestion des types
+centroides <- communes %>%
+  st_centroid() %>%
+  select(INSEE_COM) %>%
+  mutate(INSEE_COM = as.character(INSEE_COM)) %>%  
+  left_join(ph_moyen, by = "INSEE_COM") %>%
+  mutate(
+    X = st_coordinates(.)[,1],  
+    Y = st_coordinates(.)[,2]   
+  ) %>%
+  select(INSEE_COM, X, Y, moy_ph)%>%
+  st_drop_geometry()
+
+##Extraction des valeurs----
 
 # Fonction mode (valeur la plus fréquente)
 mode_function <- function(values, coverage_fraction) {
