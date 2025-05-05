@@ -27,7 +27,6 @@ rasters_cov <- lapply(fichiers_cov, function(x) {
   rast(x)
 })
 print(rasters_cov)
-plot(rasters_cov[[]])
 
 #définir le type de covariables
 types_covariables <- c(
@@ -97,14 +96,15 @@ types_covariables <- c(
   # Ugamma : CONTINUOUS
   "continuous"
 )
-# Séparer les rasters continus et catégoriels
-rasters_continuous <- subset(rst_za, which(types_covariables == "continuous"))
-rasters_categorical <- subset(rst_za, which(types_covariables == "categorical"))
-print(rasters_continuous)
-print(rasters_categorical)
+
 
 ##Empilage des rasters----
 rst <- do.call(c, rasters_cov)
+# Séparer les rasters continus et catégoriels
+rasters_continuous <- subset(rst, which(types_covariables == "continuous"))
+rasters_categorical <- subset(rst, which(types_covariables == "categorical"))
+print(rasters_continuous)
+print(rasters_categorical)
 
 
 ##Définir un masque par la zone agricole----
@@ -114,20 +114,30 @@ zone_agricole <- ocsol[ocsol$CODE_US == "US1.1", ]
 rast_za <- rasterize(zone_agricole, rst, field=1, background=NA)
 print(rast_za)
 
-##Appliction du masque au stack----
-rst_za <- mask(rst, rast_za)
-print(rst_za)
+## Appliction du masque au stack----
+# rst_za <- mask(rst, rast_za)
+# print(rst_za)
+
+
+# conversion en df du stack en zone agricole
+gXY <- as.data.frame(rst, xy = TRUE, na.rm = TRUE) %>%  
+  mutate(across(
+    .cols = names(rasters_categorical),  
+    .fns = as.factor                    
+  ))
+
+str(gXY)
+
 
 ##Extraction des valeurs de covariables pour les points----
 donnees_pH<-st_as_sf(donnnees, coords = c("x", "y"), crs = "2154")
 
-# conversion en df du stack en zone agricole
-gXY <- as.data.frame(rst_za , xy=TRUE) %>%
-  mutate(No_UTS = as.factor(No_UTS)) %>%
-  na.omit( )
+matrice_cov <- terra::extract(rst, donnees_pH)%>%  
+  mutate(across(
+    .cols = names(rasters_categorical),  
+    .fns = as.factor                    
+  ))
 
-
-matrice_cov <- terra::extract(rst, donnees_pH)
 summary(matrice_cov)
 
 #Joindre les attributs des points avec les covariables extraites
@@ -193,20 +203,4 @@ centroides <- centroides %>%
   left_join(df_covariables, by = "INSEE_COM")
 
 saveRDS(centroides, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/centroides_covariables.rds")
-
-
-#verification 
-tm_shape(zone_agricole) + 
-  tm_polygons(col = "green",        
-              alpha = 0.5,  
-              lwd = 0.1) +               
-  
-  tm_shape(dept) +
-  tm_borders(col = "black",            
-             lwd = 2) +               
-  
-  tm_shape(donnees_pH) + 
-  tm_dots(col = "red",                 
-          size = 0.09,                  
-          alpha = 0.8)
 

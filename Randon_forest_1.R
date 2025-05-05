@@ -1,6 +1,8 @@
 #Chargement des packages nécessaires ----
+library(sf)          # manipulation de données spatiales
 library(dplyr)       # manipulation de données
 library(Boruta)      # sélection des variables importantes
+library(randomForest) 
 library(ranger)      # random forest rapide
 library(ggplot2)     # visualisation
 library(terra)       # manipulation raster
@@ -13,13 +15,51 @@ library(tidyr)       # fonctions tidyverse
 
 datacov <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/matrice_covariables.rds")
 
+#Définition des fonctions ----
+Myeval <- function(x, y){
+  
+  # mean error
+  ME <- round(mean(y - x, na.rm = TRUE), digits = 2)
+  
+  # root mean square error
+  RMSE <-   round(sqrt(mean((y - x)^2, na.rm = TRUE)), digits = 2)
+  
+  # root mean absolute error
+  MAE <-   round(mean(abs(y - x), na.rm = TRUE), digits = 2)
+  
+  # Pearson's correlation squared
+  r2 <-  round((cor(x, y, method = 'pearson', use = 'pairwise.complete.obs')^2), digits = 2)
+  
+  # MEC
+  SSE <- sum((y - x) ^ 2, na.rm = T)
+  SST <- sum((y - mean(y, na.rm = T)) ^ 2, na.rm = T)
+  NSE <- round((1 - SSE/SST), digits = 2)
+  
+  # concordance correlation coefficient
+  n <- length(x)
+  sdx <- sd(x, na.rm = T)
+  sdy <- sd(y, na.rm = T)
+  r <- stats::cor(x, y, method = 'pearson', use = 'pairwise.complete.obs')
+  
+  # return the results
+  evalRes <- data.frame(ME = ME, MAE = MAE, RMSE = RMSE, r = r, r2 = r2, NSE = NSE)
+  
+  return(evalRes)
+}
+
+#Définition des variables ------
+
+kmax= 5 # pour la parallelisation, le nb de coeurs
+ntree = 400 # le nbre d'arbre de random forest
+k=10 # pour la k fold cross validation
+
 
 #Nettoyage des données ----
 datacov<-datacov %>% 
   select(-c(id_profil,bdatid,insee,codification)) %>% 
   na.omit()
 
-covs <- datacov[, 6:70]
+covs <- datacov[, 7:70]
 summary(covs)
 
 summary(datacov)
@@ -27,6 +67,8 @@ summary(datacov)
 # Échantillonnage à 5000 points pour réduire la taille du jeu de données
 set.seed(123)
 datacov_s <- datacov %>% sample_n(5000)
+datacov_s <- datacov_s %>% 
+  st_drop_geometry()
 
 # Ajout d’un identifiant unique pour la validation croisée
 datacov_s$id <- 1:nrow(datacov_s)
@@ -43,7 +85,6 @@ Y <- datacov_s[[idvar]]
 
 #Calibration automatique de mtry pour Random Forest ----
 
-ntree <- 400  # nombre d’arbres à utiliser
 taille <- length(idcovs)  # nombre de covariables disponibles
 
 # Calibration du paramètre mtry avec tuneRF
@@ -115,73 +156,54 @@ ggplot(Imp_QRF, aes(x = reorder(Variable, Importance), y = Importance)) +
   ggtitle("Importance des covariables sélectionnées par Boruta")
 
 # Validation croisée à 10 plis ----
+
+cat(" Validation croisée 10 plis ----------------\n")
+
+# Définir le nombre de plis
+k <- k
 set.seed(789)
-k <- 10  # nombre de plis
 folds <- cut(seq(1, nrow(datacov_shrt)), breaks = k, labels = FALSE)
 
-# Initialiser la colonne de prédictions
+# Initialisation
 datacov_shrt$predRF <- NA
 
-# Boucle CV
-resuXval <- foreach(i = 1:k, .combine = rbind) %do% {
-  cat(" Pli CV :", i, "\n")
+resuXval <- foreach(i = 1:k, .errorhandling = 'pass') %do% {
+  cat("Fold", i, "\n")
   
-  test_idx <- which(folds == i)
-  train_data <- datacov_shrt[-test_idx, ]
-  test_data <- datacov_shrt[test_idx, ]
+  # Séparer les données
+  test_indices <- which(folds == i, arr.ind = TRUE)
+  test_data <- datacov_shrt[test_indices, ]
+  train_data <- datacov_shrt[-test_indices, ]
   
-  rf_cv <- ranger(
+  # Entraîner le modèle
+  QRF_Mod.G <- ranger(
     formula = formule.ranger,
     data = train_data[, !(names(train_data) %in% c("id", "predRF"))],
     num.trees = ntree,
+    min.node.size = 3,
     quantreg = TRUE,
-    mtry = mtry_opt,
     max.depth = 15,
-    min.node.size = 3
+    mtry = mtry_opt,
+    importance = "permutation",
+    scale.permutation.importance = FALSE,
+    keep.inbag = FALSE
   )
   
-  preds <- predict(rf_cv, test_data[, cov_brt[-1]], type = "quantiles", quantiles = 0.5)$predictions
-  data.frame(id = test_data$id, predRF = preds)
+  # Prédire sur l'ensemble de test
+  preds <- predict(QRF_Mod.G,
+                   data = test_data[, cov_brt[-1]],  # retirer pH
+                   type = "quantiles",
+                   quantiles = 0.5,
+                   num.threads = parallel::detectCores())$predictions
+  
+  # Stocker les prédictions
+  datacov_shrt$predRF[test_indices] <- round(preds, 2)
+  
+  # Retourner quelque chose pour chaque pli si nécessaire
+  list(fold = i, indices = test_indices, predictions = preds)
 }
 
-# Associer les prédictions aux bonnes lignes
-datacov_shrt <- left_join(datacov_shrt, resuXval, by = "id")
+# Calculer les statistiques de validation croisée
+resuXvalQRF <-  Myeval(datacov_shrt$predRF,   datacov_shrt$pH )
 
-#Évaluation des performances du modèle ----
-# Fonctions d’évaluation
-RMSE <- function(obs, pred) sqrt(mean((obs - pred)^2))
-R2 <- function(obs, pred) 1 - sum((obs - pred)^2) / sum((obs - mean(obs))^2)
-MAE <- function(obs, pred) mean(abs(obs - pred))
-
-cat("résultats de la validation croisée (10 plis) :\n")
-cat("- RMSE :", RMSE(datacov_shrt$pH, datacov_shrt$predRF), "\n")
-cat("- MAE  :", MAE(datacov_shrt$pH, datacov_shrt$predRF), "\n")
-cat("- R²   :", R2(datacov_shrt$pH, datacov_shrt$predRF), "\n")
-
-#Spatialisation finale sur la grille gXY ----
-# gXY est un tableau de données rasterisé avec les mêmes covariables (voir script 1)
-gXY <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/gXY_covariables.rds")
-
-# Préparer les données en sélectionnant les mêmes covariables
-testD <- gXY %>% dplyr::select(all_of(cov_brt[-1]))  # on enlève pH
-
-# Filtrer uniquement les lignes complètes
-pred_input <- gXY %>%
-  filter_at(vars(all_of(cov_brt[-1])), all_vars(!is.na(.))) %>%
-  dplyr::select(x, y)
-
-# Prédiction avec le modèle RF
-QRF_Median <- predict(QRF_Mod.G,
-                      testD,
-                      type = "quantiles",
-                      quantiles = c(0.5),
-                      num.threads = parallel::detectCores())$predictions
-
-# Création d’un tableau spatial avec les prédictions
-QRF_Median50 <- cbind(pred_input, QRF_Median = QRF_Median[, 1])
-
-# Création raster
-r <- rast(QRF_Median50, type = "xyz")
-
-# Sauvegarde du raster final
-writeRaster(r, filename = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/prediction_pH_RF.tif", overwrite = TRUE)
+resuXvalQRF
