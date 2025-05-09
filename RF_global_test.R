@@ -3,14 +3,13 @@ library(sf)
 library(randomForest)
 library(ranger)
 library(Boruta)
-library(terra)
 library(raster)
 library(writexl)
-library(ggplot2)
+# library(ggplot2) --> pour info, le tidyverse importe ggplot2, dplyr et tidyr
 library(foreach)
-library(dplyr)
+# library(dplyr)
 library(tidyverse)
-library(tidyr)
+# library(tidyr)
 
 #Définition des fonctions ----
 Myeval <- function(x, y){
@@ -44,12 +43,39 @@ Myeval <- function(x, y){
   return(evalRes)
 }
 
+kCV <- function(f){
+  require(ranger)
+  QRF_Mod.G <- ranger(
+    formula = as.formula("pH ~ ."),
+    data = X2[-f, -1],
+    num.trees = nt,
+    min.node.size = 3,
+    quantreg = TRUE,
+    max.depth = 15,
+    mtry = mtry_opt,
+    importance = "permutation",
+    scale.permutation.importance = FALSE,
+    keep.inbag=FALSE
+  )
+  
+  preds <- predict(QRF_Mod.G,
+                   data= X2[f, -c(1,2)],  # retirer pH
+                   type = "quantiles",
+                   quantiles = 0.5,
+                   num.threads = parallel::detectCores())$predictions
+  
+  preds
+}
+
 # Définition des paramètres à tester-----
-liste_ntree <- c(400, 500, 600, 700, 800, 900, 1000)
+liste_ntree <- seq(50,400,50)
 tous_les_resultats <- list()  # stockera les résultats pour chaque ntree
 
 # Chargement des données----
-datacov <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/matrice_covariables.rds")
+# changer le répertoire de travail
+setwd("J:/traitement_donnees/MameGadiaga/resultats")
+
+datacov <- readRDS("matrice_covariables.rds")
 
 datacov_s <- datacov %>%
   select(-c(id_profil, bdatid, insee, codification)) %>%
@@ -66,7 +92,104 @@ idvar <- "pH"
 Y <- datacov_s[[idvar]]
 X <- datacov_s[, idcovs]
 
-# Boucle principale sur chaque ntree
+# Sélection d'un sous ensemble de variables -------------
+# Boruta sélectionne les variables pertinentes en se basant sur l’importance de permutation
+result_brt <- Boruta(X, Y)
+
+plot(result_brt)
+
+# Forcer une décision sur les variables incertaines
+result_brt_approche <- TentativeRoughFix(result_brt)
+
+# Liste finale des covariables confirmées
+cov_brt <- getSelectedAttributes(result_brt_approche)
+
+#enregistrer la liste des covariables
+save(cov_brt, file = "liste_variables_boruta.Rds")
+load("liste_variables_boruta.Rds")
+
+# créer un sous-jeu de données avec les variables retenues par Boruta
+X2 <-  datacov_s[, c("id", "pH", cov_brt)]
+
+
+# Calibrage des hyperparamètres -----------------
+
+## mettre en place la parallélisation (sera utilisée pour la kCV) ----------
+#nombre de coeurs utilisés
+n.cores <- parallel::detectCores() - 1
+
+#créér le cluster
+my.cluster <- parallel::makeCluster(
+  n.cores, 
+  type = "PSOCK"
+)
+
+# définir les clusters comme hôtes de la fonction %dopar%
+doParallel::registerDoParallel(cl = my.cluster)
+
+
+## Calcul ------------
+res_calib <- lapply(liste_ntree,
+                    
+                    function(nt){
+                      # Étape 1 : Tune mtry
+                      bestmtry <- tuneRF(
+                        x = X2[,-c(1,2)],
+                        y = Y,
+                        stepFactor = 1.3,
+                        mtryStart = round(sqrt(length(idcovs))),
+                        improve = 1e-5,
+                        ntree = nt,
+                        plot = FALSE
+                      )
+                      mtry_opt <- bestmtry[which.min(bestmtry[, 2]), 1]
+                      
+                      # Etape 2 : Validation croisée 
+                      folds <- pls::cvsegments(N = length(Y),k = 10)
+                      
+                      res <- foreach(f = folds) %dopar% {
+                        require(ranger)
+                        QRF_Mod.G <- ranger(
+                          formula = as.formula("pH ~ ."),
+                          data = X2[-f, -1],
+                          num.trees = nt,
+                          min.node.size = 3,
+                          quantreg = TRUE,
+                          max.depth = 15,
+                          mtry = mtry_opt,
+                          importance = "permutation",
+                          scale.permutation.importance = FALSE,
+                          keep.inbag=FALSE
+                        )
+                        
+                        preds <- predict(QRF_Mod.G,
+                                         data= X2[f, -c(1,2)],  # retirer pH
+                                         type = "quantiles",
+                                         quantiles = 0.5,
+                                         num.threads = parallel::detectCores())$predictions
+                        
+                        preds
+                      }
+                      
+                      # Etape 3 : calculer les métriques
+                      
+                      # recoller les résultats
+                      res_df <- data.frame(obs = Y, pred = NA) 
+                      for(k in 1:10){
+                        res_df$pred[folds[[k]]] <- res[[k]]
+                      }
+                      
+                      #calculer les métriques
+                      metrique <- Myeval(res_df$obs, res_df$pred)
+                      metrique$ntree <- nt
+                      metrique$mtry <- mtry_opt
+                      
+                      # renvoyer les métriques
+                      return(metrique)
+                    })
+
+# SUITE SCRIPT MAME -----------------------------
+
 for (ntree_val in liste_ntree) {
   cat("\n Traitement ntree =", ntree_val, "----------------------\n")
   
