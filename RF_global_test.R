@@ -155,13 +155,6 @@ res_calib <- lapply(liste_ntree,
                       
                       # Etape 3 : calculer les métriques
                       
-                      # recoller les résultats
-                      res_df <- data.frame(obs = Y, pred = NA)
-                      for(k in 1:10){
-                        res_df$pred[folds[[k]]] <- res[[k]]
-                      }
-
-                      #calculer les métriques
                       metrique <- Myeval(res_df$obs, res_df$pred)
                       metrique$ntree <- nt
                       metrique$mtry <- mtry_opt
