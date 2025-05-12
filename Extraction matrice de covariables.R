@@ -8,10 +8,10 @@ library(exactextractr)
 library(tmap)
 
 #Chargement des données----
-donnnees <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat.rds")
+donnnees <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat_C.rds")
 ocsol<-vect("Y:/BDAT/traitement_donnees/MameGadiaga/prétraitement/Analyse/Codes_Mame/Donnees/OCCUPATION_SOL.shp")
 communes <- st_read("Y:\\BDAT\\traitement_donnees\\MameGadiaga\\prétraitement\\data\\communes53_2014.shp")
-ph_moyen<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/ph_moyen.rds")
+C_moyen<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/C_moyen.rds")
 dept<- st_read("Y:\\BDAT\\traitement_donnees\\MameGadiaga\\prétraitement\\data\\dept53_rep.shp")
 
 #Extraction des matrices de covariables pour les données ponctuelles----
@@ -126,13 +126,14 @@ gXY <- as.data.frame(rst, xy = TRUE, na.rm = TRUE) %>%
     .fns = as.factor                    
   ))
 
+saveRDS(gXY, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/gXY.rds")
 str(gXY)
 
 
 ##Extraction des valeurs de covariables pour les points----
-donnees_pH<-st_as_sf(donnnees, coords = c("x", "y"), crs = "2154")
+donnees_C<-st_as_sf(donnnees, coords = c("x", "y"), crs = "2154")
 
-matrice_cov <- terra::extract(rst, donnees_pH)%>%  
+matrice_cov <- terra::extract(rst, donnees_C)%>%  
   mutate(across(
     .cols = names(rasters_categorical),  
     .fns = as.factor                    
@@ -142,17 +143,17 @@ summary(matrice_cov)
 
 #Joindre les attributs des points avec les covariables extraites
 
-donnees_extraits <- cbind(as.data.frame(donnees_pH), matrice_cov)
+donnees_extraits <- cbind(as.data.frame(donnees_C), matrice_cov)
 
 summary(donnees_extraits)
 
 #Sauvegarde de la matrice de covariables
-saveRDS(donnees_extraits, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/matrice_covariables.rds")
+saveRDS(donnees_extraits, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/matrice_covariables_C.rds")
 
 #Extraction des matrices de covariables pour les centroides----
 
 ##Création des centroides des communes----
-ph_moyen <- ph_moyen %>%
+C_moyen <- C_moyen %>%
   mutate(INSEE_COM = as.character(INSEE_COM)) 
 
 ##Création des centroïdes avec gestion des types
@@ -160,12 +161,12 @@ centroides <- communes %>%
   st_centroid() %>%
   select(INSEE_COM) %>%
   mutate(INSEE_COM = as.character(INSEE_COM)) %>%  
-  left_join(ph_moyen, by = "INSEE_COM") %>%
+  left_join(C_moyen, by = "INSEE_COM") %>%
   mutate(
     X = st_coordinates(.)[,1],  
     Y = st_coordinates(.)[,2]   
   ) %>%
-  select(INSEE_COM, X, Y, moy_ph)%>%
+  select(INSEE_COM, X, Y, moy_C)%>%
   st_drop_geometry()
 
 ##Extraction des valeurs----
@@ -202,5 +203,5 @@ df_covariables <- df_covariables %>%
 centroides <- centroides %>%
   left_join(df_covariables, by = "INSEE_COM")
 
-saveRDS(centroides, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/centroides_covariables.rds")
+saveRDS(centroides, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/centroides_covariables_C.rds")
 
