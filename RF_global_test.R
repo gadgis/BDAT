@@ -44,8 +44,6 @@ Myeval <- function(x, y){
 }
 
 
-# Définition des paramètres à tester-----
-liste_ntree <- seq(50,400,50)
 
 # Chargement des données----
 # changer le répertoire de travail
@@ -106,7 +104,8 @@ doParallel::registerDoParallel(cl = my.cluster)
 
 ## Calcul ------------
 
-liste_ntree <- 2:5
+liste_ntree <- seq(50,400,50)
+
 res_calib <- lapply(liste_ntree,
                     
                     function(nt){
