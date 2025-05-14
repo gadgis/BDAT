@@ -114,10 +114,7 @@ zone_agricole <- ocsol[ocsol$CODE_US == "US1.1", ]
 rast_za <- rasterize(zone_agricole, rst, field=1, background=NA)
 print(rast_za)
 
-## Appliction du masque au stack----
-# rst_za <- mask(rst, rast_za)
-# print(rst_za)
-
+writeRaster(rast_za, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rast_za.tif", filetype="GTiff")
 
 # conversion en df du stack en zone agricole
 gXY <- as.data.frame(rst, xy = TRUE, na.rm = TRUE) %>%  
