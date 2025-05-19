@@ -1,0 +1,230 @@
+library(sf) # manipuler les datas SIG vector
+library(tmap)  # outil d'édution de carte
+library(readxl) # lecture de fichier excel
+library(tidyr) # reroganisation des données
+library(dplyr)  # grammaire de manipulation de données
+library(terra) # manipuler des données raster-pixels
+library(ggplot2) # graphiques
+library(sp) # ancetre de sf. Pourquoi l'utiliser ?
+library(randomForest) # randomForest pour utiliser tuneRandomForest
+library(Boruta)  # implementation  de selection de variables de randomForest
+library(ranger) # quantile randomForest, version optimée de randomForest
+library(caret) # modelisation creation de modeles prédictifs avec tuning validation-croisée
+library(foreach) # boucles optimisées de R plus facile à coder voir option combine
+
+
+library(gstlearn) # géostatistique
+library(ggpubr) # pour les graphiques
+library(ggnewscale)
+
+
+library(raster) # copie de terra mais pour le package OGC
+library(OGC) # Pour le calcul des coordonnées obliques
+
+
+# INLA SPDE avec inla bru, approche bayesienne de la géostatistique
+library(INLA)
+library(inlabru)
+
+
+
+## Fonction utilsée pour la validation --------------
+
+Myeval <- function(x, y){
+  
+  # mean error
+  ME <- round(mean(y - x, na.rm = TRUE), digits = 2)
+  
+  # root mean square error
+  RMSE <-   round(sqrt(mean((y - x)^2, na.rm = TRUE)), digits = 2)
+  
+  # root mean absolute error
+  MAE <-   round(mean(abs(y - x), na.rm = TRUE), digits = 2)
+  
+  # Pearson's correlation squared
+  r2 <-  round((cor(x, y, method = 'pearson', use = 'pairwise.complete.obs')^2), digits = 2)
+  
+  # MEC
+  SSE <- sum((y - x) ^ 2, na.rm = T)
+  SST <- sum((y - mean(y, na.rm = T)) ^ 2, na.rm = T)
+  NSE <- round((1 - SSE/SST), digits = 2)
+  
+  # concordance correlation coefficient
+  n <- length(x)
+  sdx <- sd(x, na.rm = T)
+  sdy <- sd(y, na.rm = T)
+  r <- stats::cor(x, y, method = 'pearson', use = 'pairwise.complete.obs')
+  # scale shift
+  v <- sdx / sdy
+  sx2 <- var(x, na.rm = T) * (n - 1) / n
+  sy2 <- var(y, na.rm = T) * (n - 1) / n
+  # location shift relative to scale
+  u <- (mean(x, na.rm = T) - mean(y, na.rm = T)) / ((sx2 * sy2)^0.25)
+  Cb <- ((v + 1 / v + u^2)/2)^-1
+  rCb <- r * Cb
+  rhoC <- round(rCb, digits = 2)
+  
+  Cb <- round(Cb, digits = 2)
+  r <- round(r, digits = 2)
+  
+  # return the results
+  evalRes <- data.frame(ME = ME, MAE = MAE, RMSE = RMSE, r = r, r2 = r2, NSE = NSE, rhoC = rhoC, Cb = Cb)
+  
+  return(evalRes)
+}
+
+
+## Définition des variables ------
+
+name="pH"
+kmax= 5 # pour la parallelisation, le nb de coeurs
+ntree = 200 # le nbre d'arbre de random forest
+nbOGC = 5 # le nombre de pseudo covariables oblique
+
+k=10 # pour la k fold cross validation
+
+nsim=100 # for bayesian inla simulation
+
+
+NomsCoord <- c("x","y")
+
+# 1 Preparation des données pour la spatialisation
+
+l = list.files("~/data/Covariates_MAall/",full.names = T)
+
+st <- rast(l)
+
+# plot(st)
+# 
+# writeRaster(st, file = "output/covariables.tiff" , overwrite = T)
+
+# prepare covar into a table from the stack r1
+gXY <- as.data.frame(st , xy=TRUE) %>%
+  na.omit( )
+
+
+
+
+dtTB <- readRDS("output/igcs_bdat.rds")
+
+
+# attribution d'un id par sites (pour les doublons analytique possible)
+datacov <- terra::extract( st , 
+                           dtTB %>%
+                             st_as_sf(coords = NomsCoord ,
+                                      crs = 2154)
+                           ) %>% 
+  bind_cols(dtTB %>%
+              dplyr::select(all_of(c( name,NomsCoord)  )
+                            )
+            ) %>%
+
+  mutate(id = row_number()) %>%
+  na.omit()
+
+
+
+fold = createFolds(y = datacov$id, k = k)
+
+
+# 3 Modélisation par RF -----
+
+colnames(datacov)
+
+# spécifier les numéro des colonnes pour les covariables et la variable
+idcovs = 2:65
+idvar = 66
+
+source("codeRK/RandomForest.R")
+
+resuXvalQRF
+
+# 2 krigeage ordinaire --------
+# https://inlabru-org.github.io/inlabru/articles/random_fields_2d.html
+# Pour le krigeage, il faut retirer les doublons analytique
+
+# create a repertory \output to save the result
+source("KO_INLASPDE.R")
+
+resuXvalTKO
+
+
+
+
+# prepare sp data for inlabru
+
+dataINLA <- datacov[,c(NomsCoord,name)]
+dataINLA$activ <- dataINLA[,name]
+coords <- datacov[,NomsCoord]
+
+coordinates(dataINLA) <- NomsCoord
+proj4string(dataINLA) <-  "epsg:2154"
+
+
+# creation d'un tableau avec les prédictions random forest
+
+r <- rast("output/pHqrf.tif")
+
+dataINLA$qrf <-  terra::extract(  r , vect(dataINLA)  )$QRF_Median
+
+pxl <- as.data.frame(r,xy=T)
+colnames(pxl)[3] <- "qrf"
+gridded(pxl) <- ~x+y
+
+source("codeRK/KO_INLASPDE.R")
+
+resuXval
+
+# 4 Krigeage avec dérive externe -------------
+
+
+
+source("KED_INLASPDE.R")
+resuXvalpredINLAKED
+
+## Modelisation et spatilisation
+
+
+
+# 5 Synthèse -----
+
+## Validation croisée
+
+resuXvalQRF
+resuXvalTKO
+resuXvalpredINLAKED
+
+## Carte
+
+qrf =   rast("output/pHqrf.tif")
+koINLA =   rast("output/predKOINLA.tif")
+kedINLA =   rast("output/predKEDINLA.tif")
+
+qrf = terra::resample(qrf,kedINLA)
+koINLA = terra::resample(koINLA,kedINLA)
+
+predstack <- c(koINLA,qrf,kedINLA)
+names(predstack) <- c("Krigeage Ordi. INLA","QRF","KED-INLA")
+plot(predstack)
+
+tm_shape(predstack) +
+  tm_raster(
+    col.scale = tm_scale(values = terrain.colors(10) ,
+                         style = "quantile",n = 10),
+    col.legend = 
+      tm_legend(
+        position = c(0,0.3),
+        item.height = .6,
+        item.width = .5,
+        item.r = 0, 
+        text.size = .3,
+        item.space = 0.05, 
+        item.na.space = .51, 
+        title.align = "Carbone")
+  )
+
+# tmap_mode("view")
+# tm_shape(predstack[[3]]) + tm_raster(style="quantile" , n=8)
+# tmap_mode("plot")
+
+
