@@ -164,7 +164,7 @@ BDAT<-BDAT %>%
 
 summary(BDAT %>% select(pho, argi, sabt,limt, corgox, cecmet))
 
-
+saveRDS(BDAT, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/BDAT_53.rds")
 
 # Pretraitement sur IGCS ----
 
@@ -271,6 +271,8 @@ igcs_agri_df<-igcs_agri_df %>%
 
 igcs_agri_df<-igcs_agri_df%>%
   filter( is.na(typ_pr_)) 
+
+saveRDS(igcs_agri_df, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_agri.rds")
 
 
 ###Harmonisation des données sur le pH----

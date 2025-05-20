@@ -360,7 +360,7 @@ rast_median_cent <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rast_
  df_cent <- as.data.frame(rast_median_cent, xy = TRUE, na.rm = TRUE) |>
    rename(pH = 3) |>
    mutate(pH_cls = cut(pH, breaks = brk, labels = labs, right = FALSE),
-          raster  = "Modèle_centroïdess")
+          raster  = "Modèle_centroïdes")
  
  
  df_median  <- as.data.frame(rast_median, xy = TRUE, na.rm = TRUE) |>

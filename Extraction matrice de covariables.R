@@ -202,3 +202,6 @@ centroides <- centroides %>%
 
 saveRDS(centroides, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/centroides_covariables_C.rds")
 
+point_pH<-st_as_sf(donnnees, coords = c("x", "y"), crs = 2154)
+#exporter len shapefile
+st_write(point_pH, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/point_pH.shp", delete_dsn = TRUE)
