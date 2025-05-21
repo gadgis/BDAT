@@ -1,5 +1,7 @@
 # RandomForest ----
-
+library(iml)
+library(mlr)
+library(tuneRanger)
 ##### BORUTA #####
 ### A CHANGER SI CHANGE NB DE COVARIABLES
 
@@ -18,34 +20,36 @@ taille = ncol(datacov)-3
 
 
 
-library(iml)
-library(mlr)
+
 
 
 
 
 #Boruta
-result_brt = Boruta(X, Y,                         #classification de l'importance des covariables par boruta
-                    mtry = taille ,
-                    min.node.size = 3 ,
-                    ntree = ntree)
+# result_brt = Boruta(X, Y,                         #classification de l'importance des covariables par boruta
+#                     mtry = taille ,
+#                     min.node.size = 3 ,
+#                     ntree = ntree)
+# 
+# 
+# Stats_brt = attStats(result_brt)                  #résultats du boruta
+# cov_brt = getSelectedAttributes(result_brt)       #sélection des covariables confirmées
+# 
+# 
+# result_brt_approche = TentativeRoughFix(result_brt)#résultats en forçant les indécis
+# cov_brt = getSelectedAttributes((result_brt_approche))      #sélection du nouvel ensemble
+# 
+# classement_brt = Stats_brt %>% 
+#   arrange(desc(medianImp))                        #classe les covariables selon la valeur de la médiane
+# 
+# classement_brt_approche = attStats(result_brt_approche) %>% 
+#   arrange(desc(medianImp))                        #pareil pour les covariables plus complètes
+# 
+# classement_brt 
+# 
+# saveRDS(cov_brt, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"_cov_brt.rds"))
 
-
-Stats_brt = attStats(result_brt)                  #résultats du boruta
-cov_brt = getSelectedAttributes(result_brt)       #sélection des covariables confirmées
-
-
-result_brt_approche = TentativeRoughFix(result_brt)#résultats en forçant les indécis
-cov_brt = getSelectedAttributes((result_brt_approche))      #sélection du nouvel ensemble
-
-classement_brt = Stats_brt %>% 
-  arrange(desc(medianImp))                        #classe les covariables selon la valeur de la médiane
-
-classement_brt_approche = attStats(result_brt_approche) %>% 
-  arrange(desc(medianImp))                        #pareil pour les covariables plus complètes
-
-classement_brt 
-
+cov_brt<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pH_cov_brt.rds")
 #Création du tableau des covariables séléctionnées
 
 cov_brt = c(name, cov_brt)
@@ -131,7 +135,7 @@ QRF_Median50 <- bind_cols(gXY %>%
 r <- rast(QRF_Median50, type="xyz")
 
 
-terra::writeRaster(r,file=paste0("output/",name,"qrf.tif"),overwrite=TRUE)
+terra::writeRaster(r,file=paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"qrf.tif"),overwrite=TRUE)
 
 # k fold -------------
 

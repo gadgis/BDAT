@@ -1,11 +1,14 @@
-# INLA -------------
+library(INLA)
+library(inlabru)
 
+# INLA -------------
+inla.setOption(pardiso.license ="82F70E96BE7DA6A5956D4DF8F31E127ACCB33C981DE83F430BA469A2")
 inla.setOption(
   num.threads = 15 ,
   inla.mode="experimental"
 )
 # il faut récupérer une licence sur Pardiso : inla.pardiso()
-# inla.setOption(pardiso.license ="82F70E96BE7DA6A5956D4DF8F31E127ACCB33C981DE83F430BA469A2")
+
 
 
 
@@ -13,7 +16,7 @@ inla.setOption(
 
 # Grille de prédictions
 # transformation en sp depuis terra
-pxl <- as.data.frame(parcR,xy=T)
+pxl <- as.data.frame(r,xy=T)
 colnames(pxl)[3] <- "qrf"
 gridded(pxl) <- ~x+y
 
@@ -47,11 +50,12 @@ gridded(pxl) <- ~x+y
 # )
 
 
-max.edge = diff(range(coords[,1]))/(3*5)
+max.edge = diff(range(coords[,1]))/(3*5) # taille des triangles au cœur du maillage
 
-bound.outer = diff(range(coords[,1]) ) / 3
+bound.outer = diff(range(coords[,1]) ) / 3 # marge externe où les triangles deviennent plus grands
 
-mesh3 = inla.mesh.2d(loc=coords,
+
+mesh3 = inla.mesh.2d(loc=coords,        # noeuds forcés aux points de mesure
                      max.edge = c(1,2)*max.edge,
                      offset=c(max.edge, bound.outer),
                      cutoff = max.edge/10)
@@ -88,17 +92,19 @@ ggplot() +
 # 
 
 # Modelling inla
+
+##Définit le champ gaussien Matérn
 matern <-
   INLA::inla.spde2.pcmatern(mesh3,
                             alpha = 2,
                             prior.sigma = c(10, 0.01),# P(sigma > 1) = 0.5
                             prior.range = c(500, 0.01)  # P(range < 100000 m) = 0.9
   )
-
+##Définit le modèle
 cmp <- activ ~ Intercept(1) +
   field(coordinates, model = matern)
 
-
+#Ajuste le modèle
 fitKO <- inlabru::bru(components = cmp,
                       data = dataINLA,
                       family = "Gaussian",

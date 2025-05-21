@@ -11,16 +11,16 @@ library(Boruta)  # implementation  de selection de variables de randomForest
 library(ranger) # quantile randomForest, version optimée de randomForest
 library(caret) # modelisation creation de modeles prédictifs avec tuning validation-croisée
 library(foreach) # boucles optimisées de R plus facile à coder voir option combine
-
+library(raster) # manipuler des données raster
 
 library(gstlearn) # géostatistique
 library(ggpubr) # pour les graphiques
 library(ggnewscale)
-
+library(doParallel)
 
 library(raster) # copie de terra mais pour le package OGC
 library(OGC) # Pour le calcul des coordonnées obliques
-
+library(tuneRanger)
 
 # INLA SPDE avec inla bru, approche bayesienne de la géostatistique
 library(INLA)
@@ -77,8 +77,8 @@ Myeval <- function(x, y){
 ## Définition des variables ------
 
 name="pH"
-kmax= 5 # pour la parallelisation, le nb de coeurs
-ntree = 200 # le nbre d'arbre de random forest
+kmax= 22 # pour la parallelisation, le nb de coeurs
+ntree = 350 # le nbre d'arbre de random forest
 nbOGC = 5 # le nombre de pseudo covariables oblique
 
 k=10 # pour la k fold cross validation
@@ -89,12 +89,16 @@ nsim=100 # for bayesian inla simulation
 NomsCoord <- c("x","y")
 
 # 1 Preparation des données pour la spatialisation
+#Extraction des matrices de covariables pour les données ponctuelles----
 
-l = list.files("~/data/Covariates_MAall/",full.names = T)
+chemin_cov<- "Y:/BDAT/traitement_donnees/MameGadiaga/data/Covariates_MAall"
+
+##liste des fichiers de covariables----
+l<- list.files(chemin_cov, pattern = ".tif$", full.names = TRUE)
 
 st <- rast(l)
-
-# plot(st)
+rast_za <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rast_za.tif")
+plot(st)
 # 
 # writeRaster(st, file = "output/covariables.tiff" , overwrite = T)
 
@@ -105,7 +109,7 @@ gXY <- as.data.frame(st , xy=TRUE) %>%
 
 
 
-dtTB <- readRDS("output/igcs_bdat.rds")
+dtTB <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat.rds")
 
 
 # attribution d'un id par sites (pour les doublons analytique possible)
@@ -135,21 +139,12 @@ colnames(datacov)
 idcovs = 2:65
 idvar = 66
 
-source("codeRK/RandomForest.R")
+source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/RandomForest.R")
 
 resuXvalQRF
 
 # 2 krigeage ordinaire --------
 # https://inlabru-org.github.io/inlabru/articles/random_fields_2d.html
-# Pour le krigeage, il faut retirer les doublons analytique
-
-# create a repertory \output to save the result
-source("KO_INLASPDE.R")
-
-resuXvalTKO
-
-
-
 
 # prepare sp data for inlabru
 
@@ -163,23 +158,19 @@ proj4string(dataINLA) <-  "epsg:2154"
 
 # creation d'un tableau avec les prédictions random forest
 
-r <- rast("output/pHqrf.tif")
+r <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pHqrf.tif")
 
 dataINLA$qrf <-  terra::extract(  r , vect(dataINLA)  )$QRF_Median
 
-pxl <- as.data.frame(r,xy=T)
-colnames(pxl)[3] <- "qrf"
-gridded(pxl) <- ~x+y
+source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KO_INLASPDE.R")
 
-source("codeRK/KO_INLASPDE.R")
-
-resuXval
+resuXvalTKO
 
 # 4 Krigeage avec dérive externe -------------
 
 
 
-source("KED_INLASPDE.R")
+source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KED_INLASPDE.R")
 resuXvalpredINLAKED
 
 ## Modelisation et spatilisation
