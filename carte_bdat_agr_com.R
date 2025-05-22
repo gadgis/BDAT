@@ -22,33 +22,38 @@ d_pH<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat.rds")
 d_pH <- d_pH %>%
   select(id_profil,annee,x,y,pH,source,bdatid,insee, INSEE_COM,codification)
 
+#transformation des données pH en exponnentiel
+d_pH <- d_pH %>%
+  mutate(H = 10^(-pH))
+  
+
 #exploration des données
 summary(d_pH)
 
-#graphe de distribution (courbe) du pH
-ggplot(d_pH, aes(x = pH)) +
-  geom_density(color = "red", size = 1) +
-  labs(title = "Distribution du pH dans les données IGCS et BDAT",
-       x = "pH",
-       y = "Densité") +
-  theme_minimal()
-
-d_pH2 <- d_pH %>% 
-  filter(source %in% c("BDAT", "IGCS")) %>% 
-  mutate(source = factor(source, levels = c("BDAT", "IGCS")))
-
-# 2. Distribution pH par source
-ggplot(d_pH, aes(x = pH, color = source)) +
-  geom_density(alpha = 0.25, linewidth = 1) +     
-  scale_color_manual(values = c("#1f77b4", "#d62728"),  
-                     name   = "Source") +
-  scale_fill_manual(values  = c("#1f77b4", "#d62728"), 
-                    guide   = "none") +            
-  labs(title = "Distribution du pH selon la source",
-       x     = "pH",
-       y     = "Densité") +
-  theme_minimal() +
-  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+# #graphe de distribution (courbe) du pH
+# ggplot(d_pH, aes(x = pH)) +
+#   geom_density(color = "red", size = 1) +
+#   labs(title = "Distribution du pH dans les données IGCS et BDAT",
+#        x = "pH",
+#        y = "Densité") +
+#   theme_minimal()
+# 
+# d_pH2 <- d_pH %>% 
+#   filter(source %in% c("BDAT", "IGCS")) %>% 
+#   mutate(source = factor(source, levels = c("BDAT", "IGCS")))
+# 
+# # 2. Distribution pH par source
+# ggplot(d_pH, aes(x = pH, color = source)) +
+#   geom_density(alpha = 0.25, linewidth = 1) +     
+#   scale_color_manual(values = c("#1f77b4", "#d62728"),  
+#                      name   = "Source") +
+#   scale_fill_manual(values  = c("#1f77b4", "#d62728"), 
+#                     guide   = "none") +            
+#   labs(title = "Distribution du pH selon la source",
+#        x     = "pH",
+#        y     = "Densité") +
+#   theme_minimal() +
+#   theme(plot.title = element_text(face = "bold", hjust = 0.5))
 
 #Transformation en sf
 
@@ -100,14 +105,19 @@ ggplot() +
 pH_com <- d_pH_sf %>%
   group_by(INSEE_COM) %>%
   summarise(
-    moy_pH = round(mean(pH, na.rm = TRUE), 1),
-    med_pH= round(median(pH, na.rm = TRUE), 1),
-    sd_pH  = round(sd(pH, na.rm = TRUE), 1),
+    moy_H = mean(H, na.rm = TRUE),
+    med_H= median(H, na.rm = TRUE),
+    sd_H  = sd(H, na.rm = TRUE),
     n      = n()
   )
+#pH par commune comme log10 de la moy_H
+pH_com <- pH_com %>%
+  mutate(moy_pH = round(-log10(moy_H),1))%>%
+  select(-sd_pH)
+summary(pH_com)
 
-# pH_com_df<-pH_com %>%
-#   st_drop_geometry()
+pH_com_df<-pH_com %>%
+st_drop_geometry()
 
 #Jointure de l'agrégation" aux communes
 
@@ -119,10 +129,10 @@ mayenne_pH <- st_join(communes, pH_com, join = st_intersects)
 #Carte de la moyenne de pH par commune
 mayenne_pH <- mayenne_pH %>%
   mutate(ph_class = cut(
-    moy_pH,
+    med_pH,
     breaks = c(-Inf, 6, 6.3, 6.5, 6.8, 7, Inf),
     labels = c(
-      "[5.4 - 6[",
+      "[5.7 - 6[",
       "[6 - 6.3[",
       "[6.3 - 6.5[",
       "[6.5 - 6.8[",
@@ -138,7 +148,7 @@ ggplot() +
     values = palet, name = "Classes pH",na.value = "grey80" ) +
   theme_minimal() +
   labs(
-    title = "pH moyen par commune" )
+    title = "pH médian par commune" )
 
 # #Carte de la moyenne de C par commune
 # mayenne_C <- mayenne_C %>%                     
@@ -218,4 +228,4 @@ ggplot() +
 
 #Export des fichiers----
 saveRDS(C_com_df, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/C_moyen.rds")
-saveRDS(pH_com_df, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pH_moyen.rds")
+saveRDS(pH_com_df, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pH_median.rds")
