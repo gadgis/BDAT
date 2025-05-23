@@ -194,7 +194,7 @@ resuXval <-
           }
 
 
-resuXvalTKO <- Myeval(datacov$predINLAKO, datacov[[name]])
+resuXvalTKO <- Myeval(datacov$predINLAKO, datacov[,name])
 
 
 

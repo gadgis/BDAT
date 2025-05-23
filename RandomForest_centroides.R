@@ -172,16 +172,16 @@ resuXval <-
                                                   quantiles =  c(0.5),
                                                   num.threads = kmax )$prediction
             
-            datacov$predRF  <- as.numeric(datacov$predRF)     # force numérique
-            datacov[[name]] <- as.numeric(datacov[[name]])    # force numérique
-            
-            good <- !is.na(datacov$predRF) & !is.na(datacov[[name]])  # lignes complètes
-            
+            # datacov$predRF  <- as.numeric(datacov$predRF)     # force numérique
+            # datacov[[name]] <- as.numeric(datacov[[name]])    # force numérique
+            # 
+            # good <- !is.na(datacov$predRF) & !is.na(datacov[[name]])  # lignes complètes
+            # 
             
             
           }
 
-resuXvalQRF <- Myeval(datacov$predRF[good], datacov[[name]][good])
+resuXvalQRF <- Myeval(datacov$predRF, datacov[,name])
 
 resuXvalQRF
 
