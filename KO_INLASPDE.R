@@ -1,8 +1,9 @@
 library(INLA)
 library(inlabru)
 
+
 # INLA -------------
-inla.setOption(pardiso.license ="82F70E96BE7DA6A5956D4DF8F31E127ACCB33C981DE83F430BA469A2")
+#inla.setOption(pardiso.license ="82F70E96BE7DA6A5956D4DF8F31E127ACCB33C981DE83F430BA469A2")
 inla.setOption(
   num.threads = 15 ,
   inla.mode="experimental"
@@ -119,9 +120,11 @@ summary(fitKO)
 
 
 fi2plot = fitKO
-int.plot <- plot(fi2plot, "Intercept")
+#diagnostic des postrior
 spde.range <- spde.posterior(fi2plot, "field", what = "range")
 spde.logvar <- spde.posterior(fi2plot, "field", what = "log.variance")
+
+int.plot <- plot(fi2plot, "Intercept")
 range.plot <- plot(spde.range)
 var.plot <- plot(spde.logvar)
 
@@ -146,7 +149,7 @@ p = tm_shape(rast(predKO) ) +
 
 print(p)
 
-writeRaster(rast(predKO)[["mean"]],file="output/predKOINLA.tif", overwrite = T)
+terra::writeRaster(rast(predKO)[["mean"]],file="Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKOINLA.tif", overwrite = T)
 
 # Validation croisée-------------
 print("Validation croisée----------------")

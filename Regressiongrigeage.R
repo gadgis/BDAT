@@ -119,7 +119,7 @@ datacov <- terra::extract( st ,
                                       crs = 2154)
                            ) %>% 
   bind_cols(dtTB %>%
-              dplyr::select(all_of(c( name,NomsCoord)  )
+              dplyr::select(all_of(c( name,NomsCoord,"source")  )
                             )
             ) %>%
 
@@ -142,6 +142,7 @@ idvar = 66
 source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/RandomForest.R")
 
 resuXvalQRF
+saveRDS(resuXvalQRF, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_qrf.rds")
 
 # 2 krigeage ordinaire --------
 # https://inlabru-org.github.io/inlabru/articles/random_fields_2d.html
@@ -165,14 +166,25 @@ dataINLA$qrf <-  terra::extract(  r , vect(dataINLA)  )$QRF_Median
 source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KO_INLASPDE.R")
 
 resuXvalTKO
+saveRDS(resuXvalTKO, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KO.rds")
+
 
 # 4 Krigeage avec dérive externe -------------
 
 
-
 source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KED_INLASPDE.R")
 resuXvalpredINLAKED
+saveRDS(resuXvalpredINLAKED, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KED.rds")
 
+datacov <- datacov %>%
+  mutate(predRF=round(predRF,1),
+         predINLAKO=round(predINLAKO,1),
+         predINLAKED=round(predINLAKED,1))
+  
+saveRDS(datacov, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/results_pts.rds") 
+  
+  
+  
 ## Modelisation et spatilisation
 
 
@@ -187,14 +199,34 @@ resuXvalpredINLAKED
 
 ## Carte
 
-qrf =   rast("output/pHqrf.tif")
-koINLA =   rast("output/predKOINLA.tif")
-kedINLA =   rast("output/predKEDINLA.tif")
+qrf =   rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pHqrf.tif")
+koINLA =   rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKOINLA.tif")
+kedINLA =   rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKEDINLA.tif")
 
 qrf = terra::resample(qrf,kedINLA)
 koINLA = terra::resample(koINLA,kedINLA)
 
-predstack <- c(koINLA,qrf,kedINLA)
+#apllication du mask
+
+crs(rast_za) <- "EPSG:2154"
+crs(qrf) <- "EPSG:2154"
+crs(koINLA) <- "EPSG:2154"
+crs(kedINLA) <- "EPSG:2154"
+
+
+qrf<- extend(qrf, rast_za, snap = "near")
+koINLA<- extend(koINLA, rast_za, snap = "near")
+kedINLA<- extend(kedINLA, rast_za, snap = "near")
+
+qrf_agri = mask(qrf, rast_za)
+koINLA_agri = mask(koINLA, rast_za)
+kedINLA_agri = mask(kedINLA, rast_za)
+
+writeRaster(qrf_agri, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pHqrf_final.tif", overwrite = T)
+writeRaster(koINLA_agri, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKOINLA_final.tif", overwrite = T)
+writeRaster(kedINLA_agri, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKEDINLA_final.tif", overwrite = T)
+
+predstack <- c(koINLA_agri,qrf_agri,kedINLA_agri)
 names(predstack) <- c("Krigeage Ordi. INLA","QRF","KED-INLA")
 plot(predstack)
 

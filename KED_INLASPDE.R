@@ -44,7 +44,7 @@ pred <- predict(
 
 print(p)
 
-writeRaster(rast(pred)[["mean"]],file="output/predKEDINLA.tif", overwrite = T)
+writeRaster(rast(pred)[["mean"]],file="Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKEDINLA.tif", overwrite = T)
 
 # Validation croisée-------------
 print("Validation croisée----------------")

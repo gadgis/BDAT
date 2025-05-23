@@ -1,7 +1,5 @@
 # RandomForest ----
-library(iml)
-library(mlr)
-library(tuneRanger)
+
 ##### BORUTA #####
 ### A CHANGER SI CHANGE NB DE COVARIABLES
 
@@ -20,12 +18,13 @@ taille = ncol(datacov)-3
 
 
 
+library(iml)
+library(mlr)
 
 
 
 
-
-#Boruta
+# #Boruta
 # result_brt = Boruta(X, Y,                         #classification de l'importance des covariables par boruta
 #                     mtry = taille ,
 #                     min.node.size = 3 ,
@@ -46,10 +45,10 @@ taille = ncol(datacov)-3
 #   arrange(desc(medianImp))                        #pareil pour les covariables plus complètes
 # 
 # classement_brt 
-# 
-# saveRDS(cov_brt, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"_cov_brt.rds"))
+
 
 cov_brt<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pH_cov_brt.rds")
+
 #Création du tableau des covariables séléctionnées
 
 cov_brt = c(name, cov_brt)
@@ -130,7 +129,7 @@ QRF_Median50 <- bind_cols(gXY %>%
                                       all_vars(!is.na(.))
                                       ) %>%
                             dplyr::select(x,y)     ,
-                          QRF_Median = QRF_Median[,1])
+                          QRF_Median = QRF_Median[,2])
 
 r <- rast(QRF_Median50, type="xyz")
 
