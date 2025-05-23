@@ -174,12 +174,16 @@ saveRDS(resuXvalTKO, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/me
 
 source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KED_INLASPDE.R")
 resuXvalpredINLAKED
+resuXvalpredINLAKEDTotal
+
 saveRDS(resuXvalpredINLAKED, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KED.rds")
+saveRDS(resuXvalpredINLAKEDTotal, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KED_total.rds")
 
 datacov <- datacov %>%
   mutate(predRF=round(predRF,1),
          predINLAKO=round(predINLAKO,1),
-         predINLAKED=round(predINLAKED,1))
+         predINLAKED=round(predINLAKED,1),
+         predINLAKEDTotal=round(predINLAKEDTotal,1))
   
 saveRDS(datacov, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/results_pts.rds") 
   
@@ -196,6 +200,7 @@ saveRDS(datacov, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/result
 resuXvalQRF
 resuXvalTKO
 resuXvalpredINLAKED
+resuXvalpredINLAKEDTotal
 
 ## Carte
 

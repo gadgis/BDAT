@@ -51,6 +51,9 @@ print("Validation croisée----------------")
 
 
 datacov$predINLAKED = NA
+datacov$predINLAKEDTotal = NA
+
+dataINLA$predRF <- datacov$predRF
 
   
 
@@ -86,12 +89,36 @@ resuXval <-
             
             datacov$predINLAKED[ fold[[i]] ] <-  fitted[mask] 
             
-
+            ### Avec le RF de la xva
+            
+            dataINLA$elt <- dataINLA$activ
+            dataINLA$elt[ fold[[i]] ]  <- NA
+            
+            cmp <- activ ~ Intercept(1) +
+              rfpred(predRF, model = 'linear' ) +
+              field(coordinates, model = matern)
+            
+            
+            Myfit <- bru(cmp,
+                         data = dataINLA,
+                         family = "Gaussian",
+                         options = list(
+                           control.inla = list(int.strategy = "eb"),
+                           verbose = FALSE)
+            )
+            
+            # find the prediction in the output....
+            fitted <- Myfit$summary.fitted.values$mean[1:length(dataINLA$activ)] 
+            
+            mask <- is.na(dataINLA$elt)
+            
+            datacov$predINLAKEDTotal[ fold[[i]] ] <-  fitted[mask] 
+            
           }
 
 
 resuXvalpredINLAKED <-  Myeval(datacov$predINLAKED,    datacov[,name]  )
-
+resuXvalpredINLAKEDTotal <-  Myeval(datacov$predINLAKEDTotal,    datacov[,name]  )
 
 
 
