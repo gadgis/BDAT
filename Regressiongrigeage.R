@@ -12,6 +12,7 @@ library(ranger) # quantile randomForest, version optimée de randomForest
 library(caret) # modelisation creation de modeles prédictifs avec tuning validation-croisée
 library(foreach) # boucles optimisées de R plus facile à coder voir option combine
 library(raster) # manipuler des données raster
+library(purrr)
 
 library(gstlearn) # géostatistique
 library(ggpubr) # pour les graphiques
@@ -77,7 +78,7 @@ Myeval <- function(x, y){
 ## Définition des variables ------
 
 name="pH"
-kmax= 22 # pour la parallelisation, le nb de coeurs
+kmax= 23 # pour la parallelisation, le nb de coeurs
 ntree = 350 # le nbre d'arbre de random forest
 nbOGC = 5 # le nombre de pseudo covariables oblique
 
@@ -99,6 +100,7 @@ l<- list.files(chemin_cov, pattern = ".tif$", full.names = TRUE)
 st <- rast(l)
 rast_za <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rast_za.tif")
 plot(st)
+rmqs<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/RMQS_pH.rds")
 # 
 # writeRaster(st, file = "output/covariables.tiff" , overwrite = T)
 
@@ -130,6 +132,9 @@ datacov <- terra::extract( st ,
 
 fold = createFolds(y = datacov$id, k = k)
 
+#EXTRACTION COVARIABLES AU NIVEAU DES POINTS RMQS
+
+
 
 # 3 Modélisation par RF -----
 
@@ -149,7 +154,7 @@ saveRDS(resuXvalQRF, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/me
 
 # prepare sp data for inlabru
 
-dataINLA <- datacov[,c(NomsCoord,name)]
+dataINLA <- datacov[,c(NomsCoord,name,"predRF")]
 dataINLA$activ <- dataINLA[,name]
 coords <- datacov[,NomsCoord]
 
@@ -174,18 +179,46 @@ saveRDS(resuXvalTKO, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/me
 
 source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KED_INLASPDE.R")
 resuXvalpredINLAKED
-resuXvalpredINLAKEDTotal
+
 
 saveRDS(resuXvalpredINLAKED, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KED.rds")
-saveRDS(resuXvalpredINLAKEDTotal, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KED_total.rds")
 
 datacov <- datacov %>%
   mutate(predRF=round(predRF,1),
          predINLAKO=round(predINLAKO,1),
-         predINLAKED=round(predINLAKED,1),
-         predINLAKEDTotal=round(predINLAKEDTotal,1))
+         predINLAKED=round(predINLAKED,1))
   
 saveRDS(datacov, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/results_pts.rds") 
+
+data<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/results_pts.rds")
+
+
+
+
+# Supposons que votre dataframe s'appelle df
+# Liste des colonnes de prédictions
+pred_cols <- c("predRF", "predINLAKED", "predINLAKO")
+
+# Calcul des indicateurs pour chaque combinaison source x prédicteur
+results <- data %>%
+  group_by(source) %>%
+  group_map(~ {
+    source_val <- .y$source  # ici on récupère la valeur du groupe
+    map_dfr(pred_cols, function(pred_col) {
+      eval_metrics <- Myeval(x = .x[[pred_col]], y = .x$pH)
+      eval_metrics <- mutate(eval_metrics,
+                             source = source_val,
+                             prediction = pred_col)
+      return(eval_metrics)
+    })
+  }) %>%
+  bind_rows()
+
+
+
+# Affichage du résultat
+print(results)
+
   
   
   
@@ -200,7 +233,25 @@ saveRDS(datacov, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/result
 resuXvalQRF
 resuXvalTKO
 resuXvalpredINLAKED
-resuXvalpredINLAKEDTotal
+
+resuXval <- data.frame(
+  Method = c("Random Forest", "Krigeage Ordi. INLA", "KED-INLA"),
+  ME = c(resuXvalQRF$ME, resuXvalTKO$ME, resuXvalpredINLAKED$ME),
+  MAE = c(resuXvalQRF$MAE, resuXvalTKO$MAE, resuXvalpredINLAKED$MAE),
+  RMSE = c(resuXvalQRF$RMSE, resuXvalTKO$RMSE, resuXvalpredINLAKED$RMSE),
+  r2 = c(resuXvalQRF$r2, resuXvalTKO$r2, resuXvalpredINLAKED$r2),
+  NSE = c(resuXvalQRF$NSE, resuXvalTKO$NSE, resuXvalpredINLAKED$NSE),
+  rhoC = c(resuXvalQRF$rhoC, resuXvalTKO$rhoC, resuXvalpredINLAKED$rhoC),
+  Cb = c(resuXvalQRF$Cb, resuXvalTKO$Cb, resuXvalpredINLAKED$Cb)
+)
+
+print(resuXval)
+
+saveRDS(resuXval, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metriquexval_points.rds")
+
+rs <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metriquexval_points.rds")
+
+
 
 ## Carte
 
@@ -256,4 +307,95 @@ tm_shape(predstack) +
 # tmap_mode("plot")
 
 
+#Validation externe----
 
+# Extraction des covariables pour les points de validation externe
+vext <- terra::extract( st , 
+                           rmqs %>%
+                             st_as_sf(coords = NomsCoord ,
+                                      crs = 2154)
+) %>% 
+  bind_cols(rmqs %>%
+              dplyr::select(all_of(c( name,NomsCoord)  )
+              )
+  ) %>%
+  na.omit()
+
+saveRDS(vext, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/vext.rds")
+
+#Sur le modèle RF
+datacov_shrt_vext = vext[cov_brt]  
+
+test <- datacov_shrt_vext %>% 
+  dplyr::select(all_of(cov_brt[-1])) 
+
+vext$predRF <- predict(RF_Mod.G,
+                       test,
+                       num.threads = kmax )$predictions
+
+vext <- vext %>%
+  mutate(predRF=round(predRF,2))
+
+
+resuvalexRF <-  Myeval(vext$predRF,   vext[,name] )
+resuvalexRF
+
+#INLAKO
+#recupérer les prédictions qrf
+
+# prepare sp data for inlabru
+
+vextINLA <- vext[,c(NomsCoord,name,"predRF")]
+vextINLA$activ <- vextINLA[,name]
+
+
+coordinates(vextINLA) <- NomsCoord
+proj4string(vextINLA) <-  "epsg:2154"
+
+predKO <- predict(
+  Myfit_KO,
+  vextINLA,
+  n.samples = nsim,
+  ~Intercept + field   ,
+  num.threads = 10
+)
+
+vext$predKO <- predKO$mean
+
+vext$predKO <- round(vext$predKO,2)
+
+resuvalexKO <-  Myeval(vext$predKO,   vext[,name] )
+resuvalexKO
+
+#INLAKED
+
+vextINLA$qrf <-  terra::extract(  r , vect(vextINLA)  )$QRF_Median
+
+predKED <- predict(
+  Myfit_KED,
+  vextINLA,
+  n.samples = nsim,
+  ~Intercept + field + rfpred   ,
+  num.threads = 10
+)
+
+vext$predKED <- round(predKED$mean,2)
+
+resuvalexKED <-  Myeval(vext$predKED,    vext[[name]] )
+resuvalexKED
+
+# Résumé des résultats de validation externe
+resuvalex <- data.frame(
+  Method = c("Random Forest", "Krigeage Ordi. INLA", "KED-INLA"),
+  ME = c(resuvalexRF$ME, resuvalexKO$ME, resuvalexKED$ME),
+  MAE = c(resuvalexRF$MAE, resuvalexKO$MAE, resuvalexKED$MAE),
+  RMSE = c(resuvalexRF$RMSE, resuvalexKO$RMSE, resuvalexKED$RMSE),
+  r2 = c(resuvalexRF$r2, resuvalexKO$r2, resuvalexKED$r2),
+  NSE = c(resuvalexRF$NSE, resuvalexKO$NSE, resuvalexKED$NSE),
+  rhoC = c(resuvalexRF$rhoC, resuvalexKO$rhoC, resuvalexKED$rhoC),
+  Cb = c(resuvalexRF$Cb, resuvalexKO$Cb, resuvalexKED$Cb)
+)
+
+print(resuvalex)
+
+saveRDS(resuvalex, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/results_vext_points.rds")

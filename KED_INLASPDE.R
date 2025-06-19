@@ -37,6 +37,7 @@ pred <- predict(
   num.threads = 10
 )
 
+summary((rast(pred)))
 
  p = tm_shape(rast(pred) ) +
   tm_raster(c("mean"),
@@ -51,11 +52,10 @@ print("Validation croisée----------------")
 
 
 datacov$predINLAKED = NA
-datacov$predINLAKEDTotal = NA
+
 
 dataINLA$predRF <- datacov$predRF
 
-  
 
 resuXval <- 
   foreach(i = 1:k,
@@ -66,40 +66,40 @@ resuXval <-
             # set to na to run a cross valid with inla
             # Mettre en NA les individus pour la validation crois?e
             
-            dataINLA$elt <- dataINLA$activ
-            dataINLA$elt[ fold[[i]] ]  <- NA
-            
-            cmp <- elt ~ Intercept(1) +
-              rfpred(qrf, model = 'linear' ) +
-              field(coordinates, model = matern)
-            
-            
-            Myfit <- bru(cmp,
-                         data = dataINLA,
-                         family = "Gaussian",
-                         options = list(
-                           control.inla = list(int.strategy = "eb"),
-                           verbose = FALSE)
-            )
-            
-            # find the prediction in the output....
-            fitted <- Myfit$summary.fitted.values$mean[1:length(dataINLA$activ)] 
-            
-            mask <- is.na(dataINLA$elt)
-            
-            datacov$predINLAKED[ fold[[i]] ] <-  fitted[mask] 
+            # dataINLA$elt <- dataINLA$activ
+            # dataINLA$elt[ fold[[i]] ]  <- NA
+            # 
+            # cmp <- elt ~ Intercept(1) +
+            #   rfpred(predRF, model = 'linear' ) +
+            #   field(coordinates, model = matern)
+            # 
+            # 
+            # Myfit <- bru(cmp,
+            #              data = dataINLA,
+            #              family = "Gaussian",
+            #              options = list(
+            #                control.inla = list(int.strategy = "eb"),
+            #                verbose = FALSE)
+            # )
+            # 
+            # # find the prediction in the output....
+            # fitted <- Myfit$summary.fitted.values$mean[1:length(dataINLA$activ)] 
+            # 
+            # mask <- is.na(dataINLA$elt)
+            # 
+            # datacov$predINLAKED[ fold[[i]] ] <-  fitted[mask] 
             
             ### Avec le RF de la xva
             
             dataINLA$elt <- dataINLA$activ
             dataINLA$elt[ fold[[i]] ]  <- NA
             
-            cmp <- elt ~ Intercept(1) +
+            cmp <- activ ~ Intercept(1) +
               rfpred(predRF, model = 'linear' ) +
               field(coordinates, model = matern)
             
             
-            Myfit <- bru(cmp,
+            Myfit_KED <- bru(cmp,
                          data = dataINLA,
                          family = "Gaussian",
                          options = list(
@@ -108,17 +108,19 @@ resuXval <-
             )
             
             # find the prediction in the output....
-            fitted <- Myfit$summary.fitted.values$mean[1:length(dataINLA$activ)] 
+            fitted <- Myfit_KED$summary.fitted.values$mean[1:length(dataINLA$activ)] 
             
             mask <- is.na(dataINLA$elt)
             
-            datacov$predINLAKEDTotal[ fold[[i]] ] <-  fitted[mask] 
+            datacov$predINLAKED[ fold[[i]] ] <-  fitted[mask] 
             
+          
+
           }
 
 
 resuXvalpredINLAKED <-  Myeval(datacov$predINLAKED,    datacov[,name]  )
-resuXvalpredINLAKEDTotal <-  Myeval(datacov$predINLAKEDTotal,    datacov[,name]  )
+
 
 
 
