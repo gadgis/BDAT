@@ -74,10 +74,11 @@ Myeval <- function(x, y){
 }
 
 
+
 ## Définition des variables ------
 
 name="moy_pH"
-kmax= 22 # pour la parallelisation, le nb de coeurs
+kmax= 23 # pour la parallelisation, le nb de coeurs
 ntree = 350 # le nbre d'arbre de random forest
 nbOGC = 5 # le nombre de pseudo covariables oblique
 
@@ -87,6 +88,8 @@ nsim=100 # for bayesian inla simulation
 
 
 NomsCoord <- c("X","Y")
+
+
 
 # 1 Preparation des données pour la spatialisation
 #Extraction des matrices de covariables pour les données ponctuelles----
@@ -98,6 +101,9 @@ l<- list.files(chemin_cov, pattern = ".tif$", full.names = TRUE)
 
 st <- rast(l)
 rast_za <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rast_za.tif")
+
+rmqs<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/RMQS_pH.rds")
+centroides<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pH_median.rds")
 plot(st)
 # 
 # writeRaster(st, file = "output/covariables.tiff" , overwrite = T)
@@ -138,7 +144,7 @@ saveRDS(resuXvalQRF, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/me
 
 # prepare sp data for inlabru
 
-dataINLA <- datacov[,c(NomsCoord,name)]
+dataINLA <- datacov[,c(NomsCoord,name,"predRF")]
 
 dataINLA$activ <- dataINLA[,name]
 
@@ -154,7 +160,7 @@ r <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/moy_pHqrf_centroides
 
 dataINLA$qrf <-  terra::extract(  r , vect(dataINLA)  )$QRF_Median
 
-source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KO_INLASPDE_centroides.R")
+source("Y:/BDAT/traitement_donnees/MameGadiaga//Codes R/KO_INLASPDE_centroides.R")
 
 resuXvalTKO
 
@@ -165,10 +171,9 @@ saveRDS(resuXvalTKO, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/me
 
 source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KED_INLASPDE_centroides.R")
 resuXvalpredINLAKED
-resuXvalpredINLAKEDTotal
+
 
 saveRDS(resuXvalpredINLAKED, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KED_centroides.rds")
-saveRDS(resuXvalpredINLAKEDTotal, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KED_total_centroides.rds")
 
 ## Modelisation et spatilisation
 
@@ -181,7 +186,12 @@ saveRDS(resuXvalpredINLAKEDTotal, file = "Y:/BDAT/traitement_donnees/MameGadiaga
 resuXvalQRF
 resuXvalTKO
 resuXvalpredINLAKED
-resuXvalpredINLAKEDTotal
+
+
+datacov <- datacov %>%
+  mutate(predRF=round(predRF,1),
+         predINLAKO=round(predINLAKO,1),
+         predINLAKED=round(predINLAKED,1))
 
 saveRDS(datacov, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/results_centroides.rds")
 ## Carte
@@ -238,3 +248,124 @@ plot(predstack)
 # tmap_mode("plot")
 
 
+#Validation externe----
+summary(rmqs)
+
+rmqs<-rmqs %>%
+  rename(X =x,
+         Y =y)
+
+# Extraction des covariables pour les points de validation externe
+vext <- terra::extract( st , 
+                        rmqs %>%
+                          st_as_sf(coords = NomsCoord ,
+                                   crs = 2154)
+) %>% 
+  bind_cols(rmqs %>%
+              dplyr::select(all_of(c( "pH",NomsCoord)  )
+              )
+  ) %>%
+  na.omit()
+
+vext<-vext %>%
+  rename(moy_pH=pH)
+
+#Sur le modèle RF
+datacov_shrt_vext = vext[cov_brt]  
+
+test <- datacov_shrt_vext %>% 
+  dplyr::select(all_of(cov_brt[-1])) 
+
+datacov_shrt_vext$predRF <- predict(RF_Mod.G,
+                                    test,
+                                    num.threads = kmax )$predictions
+
+datacov_shrt_vext <- datacov_shrt_vext %>%
+  mutate(predRF=round(predRF,2))
+
+resuvalexRF <- Myeval(datacov_shrt_vext$predRF, datacov_shrt_vext[[name]])
+resuvalexRF
+
+#INLAKO
+#recupérer les prédictions qrf
+
+# prepare sp data for inlabru
+vext$predRF <- datacov_shrt_vext$predRF
+
+vextINLA <- vext[,c(NomsCoord,name,"predRF")]
+vextINLA$activ <- vextINLA[,name]
+
+
+coordinates(vextINLA) <- NomsCoord
+proj4string(vextINLA) <-  "epsg:2154"
+
+predKO <- predict(
+  Myfit_KO,
+  vextINLA,
+  n.samples = nsim,
+  ~Intercept + field   ,
+  num.threads = 10
+)
+
+datacov_shrt_vext$predKO <- predKO$mean
+
+datacov_shrt_vext$predKO <- round(datacov_shrt_vext$predKO,2)
+
+resuvalexKO <-  Myeval(datacov_shrt_vext$predKO, datacov_shrt_vext[[name]])
+resuvalexKO
+
+#INLAKED
+
+
+predKED <- predict(
+  Myfit_KED,
+  vextINLA,
+  n.samples = nsim,
+  ~Intercept + field + rfpred  ,
+  num.threads = 10
+)
+
+datacov_shrt_vext$predKED <- round(predKED$mean,2)
+
+resuvalexKED <-  Myeval(datacov_shrt_vext$predKED,    datacov_shrt_vext[[name]] )
+resuvalexKED
+
+# Résumé des résultats de validation externe
+resuvalex <- data.frame(
+  Method = c("Random Forest", "Krigeage Ordi. INLA", "KED-INLA"),
+  ME = c(resuvalexRF$ME, resuvalexKO$ME, resuvalexKED$ME),
+  MAE = c(resuvalexRF$MAE, resuvalexKO$MAE, resuvalexKED$MAE),
+  RMSE = c(resuvalexRF$RMSE, resuvalexKO$RMSE, resuvalexKED$RMSE),
+  r2 = c(resuvalexRF$r2, resuvalexKO$r2, resuvalexKED$r2),
+  NSE = c(resuvalexRF$NSE, resuvalexKO$NSE, resuvalexKED$NSE),
+  rhoC = c(resuvalexRF$rhoC, resuvalexKO$rhoC, resuvalexKED$rhoC),
+  Cb = c(resuvalexRF$Cb, resuvalexKO$Cb, resuvalexKED$Cb)
+)
+
+print(resuvalex)
+
+saveRDS(resuvalex, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/results_vext_cent.rds")
+
+#carte Bdat
+#jointure entre rmqs et centroides par INSEE
+rmqs <- rmqs %>%
+  mutate(INSEE_COM = as.character(INSEE_COM))
+
+centroides <- centroides %>%
+  mutate(INSEE_COM = as.character(INSEE_COM))
+
+vext_bdat <- rmqs %>%
+  left_join(centroides %>% 
+              dplyr::select(INSEE_COM, med_pH) %>%
+              rename(pH_med = med_pH), 
+            by = "INSEE_COM")
+
+resuvalexBDAT <-  Myeval(vext_bdat$pH_med, vext_bdat$pH)
+resuvalexBDAT
+
+
+rmqs_predict<-datacov_shrt_vext %>%
+  dplyr::select(all_of(c(name,"predRF","predKO","predKED"))) %>%
+  rename(pH = name)
+  
+saveRDS(rmqs_predict, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rmqs_predict_centroides.rds")

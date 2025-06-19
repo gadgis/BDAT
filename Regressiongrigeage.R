@@ -256,3 +256,4 @@ tm_shape(predstack) +
 # tmap_mode("plot")
 
 
+

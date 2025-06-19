@@ -1,14 +1,14 @@
-library(INLA)
-library(inlabru)
+# library(INLA)
+# library(inlabru)
 
 
-# INLA -------------
-#inla.setOption(pardiso.license ="82F70E96BE7DA6A5956D4DF8F31E127ACCB33C981DE83F430BA469A2")
-inla.setOption(
-  num.threads = 15 ,
-  inla.mode="experimental"
-)
-# il faut récupérer une licence sur Pardiso : inla.pardiso()
+# # INLA -------------
+# #inla.setOption(pardiso.license ="82F70E96BE7DA6A5956D4DF8F31E127ACCB33C981DE83F430BA469A2")
+# inla.setOption(
+#   num.threads = 15 ,
+#   inla.mode="experimental"
+# )
+# # il faut récupérer une licence sur Pardiso : inla.pardiso()
 
 
 
@@ -157,44 +157,44 @@ print("Validation croisée----------------")
 
 datacov$predINLAKO = NA
 
-resuXval <- 
+resuXval <-
   foreach(i = 1:k,
           .errorhandling='pass' ) %do% {
-            
+
             print(i)
-            
+
             # set to na to run a cross valid with inla
             # Mettre en NA les individus pour la validation crois?e
-            
+
             dataINLA$elt <- dataINLA$activ
             dataINLA$elt[ fold[[i]] ]  <- NA
-            
-            
-            
+
+
+
             cmp <- elt ~ Intercept(1) +
               field(coordinates,
                     model = matern)
-            
-            Myfit <- bru(cmp,
+
+            Myfit_KO <- bru(cmp,
                          data = dataINLA,
                          family = "Gaussian",
                          options = list(
                            control.inla = list(int.strategy = "eb"),
                            verbose = FALSE)
             )
-            
+
             # find the prediction in the output....
-            fitted <- Myfit$summary.fitted.values$mean[1:length(dataINLA$activ)] 
-            
+            fitted <- Myfit_KO$summary.fitted.values$mean[1:length(dataINLA$activ)]
+
             mask <- is.na(dataINLA$elt)
-            
-            datacov$predINLAKO[ fold[[i]] ] <-  fitted[mask] 
-            
-            fitted[mask] 
+
+            datacov$predINLAKO[ fold[[i]] ] <-  fitted[mask]
+
+            fitted[mask]
           }
 
 
-resuXvalTKO <- Myeval(datacov$predINLAKO, datacov[,name])
+resuXvalTKO <- Myeval(datacov$predINLAKO, datacov[[name]])
 
 
 

@@ -156,40 +156,38 @@ print("Validation croisée----------------")
 datacov$predRF <- NA
 
 
-resuXval <- 
+resuXval <-
   foreach(i = 1:k,
           .errorhandling='pass' ) %do% {
-            
+
             print(i)
-            
+
             # collecter les # des lignes (gérer les doublons)
             nblignes = which( datacov$id %in% datacov$id[ fold[[i]] ] )
-            
+
             RF_Mod.G <- ranger(formula = fomula.ranger ,
                                 data = datacov_shrt[-nblignes  , ],
                                 num.trees = ntree,
                                 mtry=res$recommended.pars$mtry ,
                                 min.node.size = res$recommended.pars$mtry ,
-                                
+
                                 quantreg = FALSE,
-                                max.depth = 15, 
-                                importance="permutation", 
+                                max.depth = 15,
+                                importance="permutation",
                                 scale.permutation.importance = FALSE, #division par l'écart-type de la variable (mise des permutations entre 0 et 1)
                                 keep.inbag = F)
-            
-            
+
+
             datacov$predRF[ nblignes ] <- predict(RF_Mod.G,
                                                     datacov_shrt[ nblignes , ],
-                                                    type = "quantiles",
-                                                    quantiles =  c(0.5),
                                                     num.threads = kmax )$prediction
-            
-            
+
+
 
           }
 
 
 resuXvalQRF <-  Myeval(datacov$predRF,   datacov[,name] )
-
+# 
 
 

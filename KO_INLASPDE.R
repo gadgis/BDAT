@@ -175,7 +175,7 @@ resuXval <-
               field(coordinates,
                     model = matern)
             
-            Myfit <- bru(cmp,
+            Myfit_KO <- bru(cmp,
                          data = dataINLA,
                          family = "Gaussian",
                          options = list(
@@ -184,7 +184,7 @@ resuXval <-
             )
             
             # find the prediction in the output....
-            fitted <- Myfit$summary.fitted.values$mean[1:length(dataINLA$activ)] 
+            fitted <- Myfit_KO$summary.fitted.values$mean[1:length(dataINLA$activ)] 
             
             mask <- is.na(dataINLA$elt)
             

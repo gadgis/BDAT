@@ -69,7 +69,7 @@ resuXval <-
             dataINLA$elt <- dataINLA$activ
             dataINLA$elt[ fold[[i]] ]  <- NA
             
-            cmp <- activ ~ Intercept(1) +
+            cmp <- elt ~ Intercept(1) +
               rfpred(qrf, model = 'linear' ) +
               field(coordinates, model = matern)
             
@@ -94,7 +94,7 @@ resuXval <-
             dataINLA$elt <- dataINLA$activ
             dataINLA$elt[ fold[[i]] ]  <- NA
             
-            cmp <- activ ~ Intercept(1) +
+            cmp <- elt ~ Intercept(1) +
               rfpred(predRF, model = 'linear' ) +
               field(coordinates, model = matern)
             
