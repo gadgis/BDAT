@@ -11,17 +11,29 @@ library(Boruta)  # implementation  de selection de variables de randomForest
 library(ranger) # quantile randomForest, version optimée de randomForest
 library(caret) # modelisation creation de modeles prédictifs avec tuning validation-croisée
 library(foreach) # boucles optimisées de R plus facile à coder voir option combine
+<<<<<<< HEAD
 library(raster) # manipuler des données raster
 library(purrr)
+=======
+
+>>>>>>> 19b95a2af0211dbcdb9373901ba63bc8bc619edd
 
 library(gstlearn) # géostatistique
 library(ggpubr) # pour les graphiques
 library(ggnewscale)
+<<<<<<< HEAD
 library(doParallel)
 
 library(raster) # copie de terra mais pour le package OGC
 library(OGC) # Pour le calcul des coordonnées obliques
 library(tuneRanger)
+=======
+
+
+library(raster) # copie de terra mais pour le package OGC
+library(OGC) # Pour le calcul des coordonnées obliques
+
+>>>>>>> 19b95a2af0211dbcdb9373901ba63bc8bc619edd
 
 # INLA SPDE avec inla bru, approche bayesienne de la géostatistique
 library(INLA)
@@ -78,8 +90,13 @@ Myeval <- function(x, y){
 ## Définition des variables ------
 
 name="pH"
+<<<<<<< HEAD
 kmax= 23 # pour la parallelisation, le nb de coeurs
 ntree = 350 # le nbre d'arbre de random forest
+=======
+kmax= 5 # pour la parallelisation, le nb de coeurs
+ntree = 200 # le nbre d'arbre de random forest
+>>>>>>> 19b95a2af0211dbcdb9373901ba63bc8bc619edd
 nbOGC = 5 # le nombre de pseudo covariables oblique
 
 k=10 # pour la k fold cross validation
@@ -90,6 +107,7 @@ nsim=100 # for bayesian inla simulation
 NomsCoord <- c("x","y")
 
 # 1 Preparation des données pour la spatialisation
+<<<<<<< HEAD
 #Extraction des matrices de covariables pour les données ponctuelles----
 
 chemin_cov<- "Y:/BDAT/traitement_donnees/MameGadiaga/data/Covariates_MAall"
@@ -101,6 +119,14 @@ st <- rast(l)
 rast_za <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rast_za.tif")
 plot(st)
 rmqs<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/RMQS_pH.rds")
+=======
+
+l = list.files("~/data/Covariates_MAall/",full.names = T)
+
+st <- rast(l)
+
+# plot(st)
+>>>>>>> 19b95a2af0211dbcdb9373901ba63bc8bc619edd
 # 
 # writeRaster(st, file = "output/covariables.tiff" , overwrite = T)
 
@@ -111,7 +137,11 @@ gXY <- as.data.frame(st , xy=TRUE) %>%
 
 
 
+<<<<<<< HEAD
 dtTB <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat.rds")
+=======
+dtTB <- readRDS("output/igcs_bdat.rds")
+>>>>>>> 19b95a2af0211dbcdb9373901ba63bc8bc619edd
 
 
 # attribution d'un id par sites (pour les doublons analytique possible)
@@ -121,7 +151,11 @@ datacov <- terra::extract( st ,
                                       crs = 2154)
                            ) %>% 
   bind_cols(dtTB %>%
+<<<<<<< HEAD
               dplyr::select(all_of(c( name,NomsCoord,"source")  )
+=======
+              dplyr::select(all_of(c( name,NomsCoord)  )
+>>>>>>> 19b95a2af0211dbcdb9373901ba63bc8bc619edd
                             )
             ) %>%
 
@@ -132,9 +166,12 @@ datacov <- terra::extract( st ,
 
 fold = createFolds(y = datacov$id, k = k)
 
+<<<<<<< HEAD
 #EXTRACTION COVARIABLES AU NIVEAU DES POINTS RMQS
 
 
+=======
+>>>>>>> 19b95a2af0211dbcdb9373901ba63bc8bc619edd
 
 # 3 Modélisation par RF -----
 
@@ -144,6 +181,7 @@ colnames(datacov)
 idcovs = 2:65
 idvar = 66
 
+<<<<<<< HEAD
 source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/RandomForest.R")
 
 resuXvalQRF
@@ -155,6 +193,27 @@ saveRDS(resuXvalQRF, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/me
 # prepare sp data for inlabru
 
 dataINLA <- datacov[,c(NomsCoord,name,"predRF")]
+=======
+source("codeRK/RandomForest.R")
+
+resuXvalQRF
+
+# 2 krigeage ordinaire --------
+# https://inlabru-org.github.io/inlabru/articles/random_fields_2d.html
+# Pour le krigeage, il faut retirer les doublons analytique
+
+# create a repertory \output to save the result
+source("KO_INLASPDE.R")
+
+resuXvalTKO
+
+
+
+
+# prepare sp data for inlabru
+
+dataINLA <- datacov[,c(NomsCoord,name)]
+>>>>>>> 19b95a2af0211dbcdb9373901ba63bc8bc619edd
 dataINLA$activ <- dataINLA[,name]
 coords <- datacov[,NomsCoord]
 
@@ -164,6 +223,7 @@ proj4string(dataINLA) <-  "epsg:2154"
 
 # creation d'un tableau avec les prédictions random forest
 
+<<<<<<< HEAD
 r <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pHqrf.tif")
 
 dataINLA$qrf <-  terra::extract(  r , vect(dataINLA)  )$QRF_Median
@@ -173,10 +233,24 @@ source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KO_INLASPDE.R")
 resuXvalTKO
 saveRDS(resuXvalTKO, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KO.rds")
 
+=======
+r <- rast("output/pHqrf.tif")
+
+dataINLA$qrf <-  terra::extract(  r , vect(dataINLA)  )$QRF_Median
+
+pxl <- as.data.frame(r,xy=T)
+colnames(pxl)[3] <- "qrf"
+gridded(pxl) <- ~x+y
+
+source("codeRK/KO_INLASPDE.R")
+
+resuXval
+>>>>>>> 19b95a2af0211dbcdb9373901ba63bc8bc619edd
 
 # 4 Krigeage avec dérive externe -------------
 
 
+<<<<<<< HEAD
 source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KED_INLASPDE.R")
 resuXvalpredINLAKED
 
@@ -222,6 +296,12 @@ print(results)
   
   
   
+=======
+
+source("KED_INLASPDE.R")
+resuXvalpredINLAKED
+
+>>>>>>> 19b95a2af0211dbcdb9373901ba63bc8bc619edd
 ## Modelisation et spatilisation
 
 
@@ -234,6 +314,7 @@ resuXvalQRF
 resuXvalTKO
 resuXvalpredINLAKED
 
+<<<<<<< HEAD
 resuXval <- data.frame(
   Method = c("Random Forest", "Krigeage Ordi. INLA", "KED-INLA"),
   ME = c(resuXvalQRF$ME, resuXvalTKO$ME, resuXvalpredINLAKED$ME),
@@ -258,10 +339,18 @@ rs <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metriquexval_poi
 qrf =   rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pHqrf.tif")
 koINLA =   rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKOINLA.tif")
 kedINLA =   rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKEDINLA.tif")
+=======
+## Carte
+
+qrf =   rast("output/pHqrf.tif")
+koINLA =   rast("output/predKOINLA.tif")
+kedINLA =   rast("output/predKEDINLA.tif")
+>>>>>>> 19b95a2af0211dbcdb9373901ba63bc8bc619edd
 
 qrf = terra::resample(qrf,kedINLA)
 koINLA = terra::resample(koINLA,kedINLA)
 
+<<<<<<< HEAD
 #apllication du mask
 
 crs(rast_za) <- "EPSG:2154"
@@ -283,6 +372,9 @@ writeRaster(koINLA_agri, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultat
 writeRaster(kedINLA_agri, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKEDINLA_final.tif", overwrite = T)
 
 predstack <- c(koINLA_agri,qrf_agri,kedINLA_agri)
+=======
+predstack <- c(koINLA,qrf,kedINLA)
+>>>>>>> 19b95a2af0211dbcdb9373901ba63bc8bc619edd
 names(predstack) <- c("Krigeage Ordi. INLA","QRF","KED-INLA")
 plot(predstack)
 
@@ -307,6 +399,7 @@ tm_shape(predstack) +
 # tmap_mode("plot")
 
 
+<<<<<<< HEAD
 #Validation externe----
 
 # Extraction des covariables pour les points de validation externe
@@ -399,3 +492,5 @@ resuvalex <- data.frame(
 print(resuvalex)
 
 saveRDS(resuvalex, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/results_vext_points.rds")
+=======
+>>>>>>> 19b95a2af0211dbcdb9373901ba63bc8bc619edd
