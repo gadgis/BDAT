@@ -197,7 +197,148 @@ resuXval <-
 resuXvalTKO <-  Myeval(datacov$predINLAKO,   datacov[,name] )
 
 
+#Validation croisée  Méthode Nicolas----
+
+# Validation croisee KO
+registerDoParallel(cores = kmax) 
+set.seed(123)
+seg <- split(1:nrow(datacov), sample(rep(1:k, length.out = nrow(datacov))))
+datacov<- datacov %>%
+  mutate(INSEE_COM = as.character(INSEE_COM))
+# Initialisation
+datacov$predINLAKO_aggr <- NA
+datacov$predINLAKO_aggr <- as.numeric(datacov$predINLAKO_aggr)
+
+# Boucle de validation croisée
+resuXval_aggr <- foreach(i = 1:k, .errorhandling = 'pass') %do% {
+  
+  print(i)
+
+  
+  # Séparer les points test et entraînement
+  nblignes <- seg[[i]]
+  train_data <- datacov[-nblignes, ]
+  test_data  <- datacov[nblignes, ]
+  
+  # Agrégation de la variable cible par commune
+  train_aggr <- train_data %>%
+    group_by(INSEE_COM) %>%
+    summarise(activ = mean(.data[[name]], na.rm = TRUE)) %>%
+    ungroup() %>%
+    left_join(centroides_communes, by = "INSEE_COM") %>%
+    filter(!is.na(x) & !is.na(y))
+  
+  # Préparation des coordonnées des points test
+  coords_test <- datacov[nblignes, c("x", "y")]
+  
+  # Création du data.frame d'entrée pour bru
+  dataINLA_aggr <- data.frame(
+    x = c(train_aggr$x, coords_test$x),
+    y = c(train_aggr$y, coords_test$y),
+    elt = c(train_aggr$activ, rep(NA, nrow(coords_test)))
+  )
+  
+  coordinates(dataINLA_aggr) <- NomsCoord
+  proj4string(dataINLA_aggr) <-  "epsg:2154"
+  
+  # Formule du modèle
+  cmp <- elt ~ Intercept(1) +
+    field(coordinates,
+          model = matern)
+  
+  # Calibration du modèle
+  Myfit_aggr <- bru(
+    cmp,
+    data = dataINLA_aggr,
+    family = "Gaussian",
+    options = list(
+      control.inla = list(int.strategy = "eb"),
+      verbose = FALSE
+    )
+  )
+  
+  # Prédictions sur tous les points
+  fitted_aggr <- Myfit_aggr$summary.fitted.values$mean[1:nrow(dataINLA_aggr)]
+  
+  # Récupération des prédictions sur les points test uniquement
+  mask <- is.na(dataINLA_aggr$elt)
+  datacov$predINLAKO_aggr[nblignes] <- fitted_aggr[mask]
+  
+  return(data.frame(seg = i, pred = fitted_aggr[mask]))
+}
+
+resuXvalINLAKO_aggr <- Myeval(datacov$predINLAKO_aggr, datacov[[name]])
 
 
+#Validation croisée Méthode Lucille----
+# Liste unique des communes
+communes_unique <- unique(datacov$INSEE_COM)
 
+# Créer les folds au niveau des communes
+set.seed(123)
+commune_folds <- split(communes_unique, sample(rep(1:k, length.out = length(communes_unique))))
 
+#initialisation
+
+datacov$predINLAKO_aggr_com <- NA  
+
+resuXval_aggr_com <- foreach(i = 1:k, .errorhandling = 'pass') %do% {
+  
+  print(paste("Fold", i))
+  
+  # Identifier les communes du fold test
+  test_communes <- commune_folds[[i]]
+  train_data <- datacov[!datacov$INSEE_COM %in% test_communes, ]
+  test_data  <- datacov[datacov$INSEE_COM %in% test_communes, ]
+  
+  # Agréger les données d'entraînement par commune
+  train_aggr <- train_data %>%
+    group_by(INSEE_COM) %>%
+    summarise(activ = mean(.data[[name]], na.rm = TRUE)) %>%
+    ungroup() %>%
+    left_join(centroides_communes, by = "INSEE_COM") %>%
+    filter(!is.na(x) & !is.na(y))
+  
+  # Préparation des coordonnées des points test
+  coords_test <- test_data[, c("x", "y")]
+  
+  # Création du data.frame d'entrée pour bru
+  dataINLA_aggr <- data.frame(
+    x = c(train_aggr$x, coords_test$x),
+    y = c(train_aggr$y, coords_test$y),
+    elt = c(train_aggr$activ, rep(NA, nrow(coords_test)))
+  )
+  
+  coordinates(dataINLA_aggr) <- NomsCoord
+  proj4string(dataINLA_aggr) <- CRS("epsg:2154")
+  
+  # Formule du modèle
+  cmp <- elt ~ Intercept(1) +
+    field(coordinates, model = matern)
+  
+  # Calibration du modèle
+  Myfit_aggr <- bru(
+    cmp,
+    data = dataINLA_aggr,
+    family = "Gaussian",
+    options = list(
+      control.inla = list(int.strategy = "eb"),
+      verbose = FALSE
+    )
+  )
+  
+  # Prédictions sur tous les points
+  fitted_aggr <- Myfit_aggr$summary.fitted.values$mean[1:nrow(dataINLA_aggr)]
+  
+  # Récupération des prédictions sur les points test uniquement
+  mask <- is.na(dataINLA_aggr$elt)
+  datacov$predINLAKO_aggr_com[which(datacov$INSEE_COM %in% test_communes)] <- fitted_aggr[mask]
+  
+  return(data.frame(fold = i, pred = fitted_aggr[mask], obs = test_data[[name]]))
+}
+
+# Évaluation
+resuXvalINLAKO_aggr_com <- Myeval(datacov$predINLAKO_aggr_com, datacov[[name]])
+print(resuXvalINLAKO_aggr_com)
+
+stopImplicitCluster()

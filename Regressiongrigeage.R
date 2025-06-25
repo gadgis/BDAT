@@ -100,8 +100,11 @@ chemin_cov<- "Y:/BDAT/traitement_donnees/MameGadiaga/data/Covariates_MAall"
 l<- list.files(chemin_cov, pattern = ".tif$", full.names = TRUE)
 
 st <- rast(l)
-rast_za <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rast_za.tif")
 plot(st)
+
+rast_za <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rast_za.tif")
+communes <- st_read("Y:/BDAT/traitement_donnees/MameGadiaga/prétraitement/Analyse/Codes_Mame/Donnees/COMMUNE.shp")
+
 rmqs<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/RMQS_pH.rds")
 df_vars <- read.csv("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/COV_RF.csv", sep = ";", stringsAsFactors = FALSE  )
 # 
@@ -154,19 +157,28 @@ resuXvalRF_commune
 resuXvalRF_aggrcom
 
 saveRDS(resuXvalQRF, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_qrf.rds")
-
+saveRDS(resuXvalRF_commune, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_qrf_N.rds")
+saveRDS(resuXvalRF_aggrcom, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_qrf_L.rds")
 # 2 krigeage ordinaire --------
 # https://inlabru-org.github.io/inlabru/articles/random_fields_2d.html
 
 # prepare sp data for inlabru
 
-dataINLA <- datacov[,c(NomsCoord,name,"predRF","predRF_aggr","predRF_aggrcom")]
+dataINLA <- datacov[,c(NomsCoord,name,"predRF","predRF_aggr","predRF_aggrcom","INSEE_COM")]
 dataINLA$activ <- dataINLA[,name]
 coords <- datacov[,NomsCoord]
 
 coordinates(dataINLA) <- NomsCoord
 proj4string(dataINLA) <-  "epsg:2154"
 
+#extraction des centroides
+centroides_communes <- st_centroid(communes) %>%
+  st_coordinates() %>%
+  as.data.frame()
+
+# Ajout du code commune
+centroides_communes$INSEE_COM <- communes$INSEE_COM
+names(centroides_communes) <- c("x", "y", "INSEE_COM")
 
 # creation d'un tableau avec les prédictions random forest
 
@@ -177,17 +189,24 @@ dataINLA$qrf <-  terra::extract(  r , vect(dataINLA)  )$QRF_Median
 source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KO_INLASPDE.R")
 
 resuXvalTKO
-saveRDS(resuXvalTKO, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KO.rds")
+resuXvalINLAKO_aggr
+resuXvalINLAKO_aggr_com
 
+saveRDS(resuXvalTKO, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KO.rds")
+saveRDS(resuXvalINLAKO_aggr, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KO_N.rds")
+saveRDS(resuXvalINLAKO_aggr_com, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KO_L.rds")
 
 # 4 Krigeage avec dérive externe -------------
 
 
 source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KED_INLASPDE.R")
 resuXvalpredINLAKED
-
+resuXvalINLAKED_aggr
+resuXvalINLAKED_aggr_com
 
 saveRDS(resuXvalpredINLAKED, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KED.rds")
+saveRDS(resuXvalINLAKED_aggr, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KED_N.rds")
+saveRDS(resuXvalINLAKED_aggr_com, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KED_L.rds")
 
 datacov <- datacov %>%
   mutate(predRF=round(predRF,1),
@@ -200,8 +219,6 @@ data<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/results_pts.rds"
 
 
 
-
-# Supposons que votre dataframe s'appelle df
 # Liste des colonnes de prédictions
 pred_cols <- c("predRF", "predINLAKED", "predINLAKO")
 
@@ -405,3 +422,5 @@ resuvalex <- data.frame(
 print(resuvalex)
 
 saveRDS(resuvalex, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/results_vext_points.rds")
+
+

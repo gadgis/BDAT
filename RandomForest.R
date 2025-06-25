@@ -372,4 +372,4 @@ resuXval_aggrcom <- foreach(i = 1:k, .combine = rbind, .packages = c("dplyr", "r
 resuXvalRF_aggrcom <- Myeval(datacov$predRF_aggrcom, datacov[[name]])
 resuXvalRF_aggrcom
 
-
+stopImplicitCluster()
