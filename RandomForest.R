@@ -101,18 +101,46 @@ Imp_RF <- data.frame(RF_Mod.G$variable.importance)
 Imp_RF$Vars <- row.names(Imp_RF)
 Imp_RF <- Imp_RF[order(Imp_RF$RF_Mod.G.variable.importance,decreasing = T),]
 
-varimp <- ggplot(Imp_RF, 
-       aes(x=reorder(Vars, RF_Mod.G.variable.importance),
-           y=RF_Mod.G.variable.importance #,  color=as.factor(var_categ)
-       )
+
+Imp_RF <- Imp_RF %>%
+  left_join(df_vars, by = "Vars")
+
+Imp_RF <- Imp_RF %>%
+  rename(importance = RF_Mod.G.variable.importance)
+
+Imp_RF$label <- iconv(Imp_RF$label, from = "", to = "UTF-8")
+
+Imp_RF_top10 <- Imp_RF %>%
+  arrange(desc(importance)) %>%
+  slice(1:10)
+
+varimp <- ggplot(Imp_RF_top10, 
+                 aes(x = reorder(label, importance), 
+                     y = importance,
+                     color = var_group)
 ) + 
-  geom_point() +
-  geom_segment(aes(x=Vars,xend=Vars,y=0,yend=RF_Mod.G.variable.importance)) +
-  scale_color_discrete(name="Variable Group") +
-  ylab("IncNodePurity") +
-  xlab("Variable Name") +
-  ggtitle(name)+
-  coord_flip()
+  geom_point(size = 1.5) +
+  geom_segment(aes(x = label, xend = label, y = 0, yend = importance)) +
+  scale_color_manual(
+    name = "Groupe de variables",
+    values = c(
+      "Topographie" = "grey50",
+      "Climat" = "#1f77b4",
+      "Vegetation" = "#2ca02c",
+      "Sol" = "#8c564b",
+      "Lithologie"= "#d62728",
+      "Radiometrie" = "#9467bd",
+      "Occupation_Sol" = "#ffdf00" )) +
+  ylab("Importance (IncNodePurity)") +
+  xlab("Variables") +
+  ggtitle(paste("Dix premières variables importantes -", "pH")) +
+  coord_flip() +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.y = element_text(size = 10),
+    legend.position = "bottom"
+  )
 
 print(varimp)
 
@@ -188,6 +216,160 @@ resuXval <-
 
 
 resuXvalQRF <-  Myeval(datacov$predRF,   datacov[,name] )
-# 
+
+#Validation croisée  Méthode Nicolas----
+
+# Validation croisee Random Forest
+
+registerDoParallel(cores = kmax) 
+set.seed(123)
+seg <- split(1:nrow(datacov), sample(rep(1:k, length.out = nrow(datacov))))
+
+# Initialisation
+datacov$predRF_aggr <- NA
+datacov$predRF_aggr <- as.numeric(datacov$predRF_aggr)
+
+# Séparer les covariables numériques et catégorielles
+cat_vars <- c("Geology1", "Geology10", "Geology11", "Geology12", "Geology2", "Geology3",
+              "Geology5", "Geology8", "Geology9", "OCS201611", "OCS2016211",
+              "OCS2016221", "typo3", "typo4", "typo5")
+num_vars <- setdiff(cov_brt[-1], cat_vars)
+
+resuXval_aggr <- foreach(i = 1:k,  .combine = rbind, .packages = c("dplyr", "ranger", "mlr", "tuneRanger")) %do% {
+  print(i)
+  cat("seg:", i, "\n")
+  
+  nblignes <- seg[[i]] 
+  train_data <- datacov[-nblignes, ]
+  test_data <- datacov[nblignes, ]
+  
+  # Agrégation sur les données d'entraînement - covariables
+  train_aggr <- train_data %>%
+    group_by(INSEE_COM) %>%
+    summarise(
+      across(all_of(num_vars), ~mean(.x, na.rm = TRUE)),
+      across(all_of(cat_vars), ~as.character(names(which.max(table(.)))))
+    ) %>%
+    ungroup()
+  
+  # Agrégation de la variable cible - variable réponse
+  y_aggr <- train_data %>%
+    group_by(INSEE_COM) %>%
+    summarise(value = mean(.data[[name]], na.rm = TRUE)) %>%
+    pull(value)
+  train_aggr[[name]] <- y_aggr
+  
+  # Conversion des variables catégorielles
+  train_aggr[cat_vars] <- lapply(train_aggr[cat_vars], factor)
+  train_aggr[num_vars] <- lapply(train_aggr[num_vars], as.numeric)
+  
+  # Tâche mlr - définir le modèle
+  rf_task <- makeRegrTask(data = train_aggr[, c(name, cov_brt[-1])], target = name)
+  res_tune <- tuneRanger(rf_task, num.trees = ntree, iters = 100, num.threads = 4)
+  
+  # Entraînement sur les données agrégées
+  rf_model <- ranger(
+    formula = as.formula(paste0(name, " ~ .")),
+    data = train_aggr[, c(name, cov_brt[-1])],
+    num.trees = ntree,
+    mtry = res_tune$recommended.pars$mtry,
+    min.node.size = res_tune$recommended.pars$min.node.size,
+    importance = "permutation",
+    keep.inbag = FALSE
+  )
+  
+
+  
+  # Données de test : covariables brutes
+  test <- test_data[, cov_brt[-1]]
+  test[cat_vars] <- lapply(test[cat_vars], factor)
+  test[num_vars] <- lapply(test[num_vars], as.numeric)
+  preds <- predict(rf_model, data = test, num.threads = kmax)$predictions
+  preds <- round(preds, 2)
+  datacov$predRF_aggr[nblignes] <- preds
+  
+  # Renvoi des résultats pour le tableau final
+  return(data.frame(fold = i, pred = preds, obs = test_data[[name]]))
+}
+
+resuXvalRF_commune <- Myeval(datacov$predRF_aggr, datacov[[name]])
+
+#Méthode de Lucille----
+# Créer les folds par commune
+set.seed(123)
+communes <- unique(datacov$INSEE_COM)
+folds_com <- split(communes, sample(rep(1:k, length.out = length(communes))))
+
+# Initialisation de la colonne des prédictions
+datacov$predRF_aggrcom <- NA_real_
+
+# Boucle séquentielle (pas dopar ici)
+resuXval_aggrcom <- foreach(i = 1:k, .combine = rbind, .packages = c("dplyr", "ranger", "mlr", "tuneRanger")) %do% {
+  cat("Fold commune:", i, "\n")
+  
+  test_communes <- folds_com[[i]]
+  train_communes <- setdiff(communes, test_communes)
+  
+  # Séparation du jeu d'entraînement et de test
+  train_data <- datacov %>% filter(INSEE_COM %in% train_communes)
+  test_data  <- datacov %>% filter(INSEE_COM %in% test_communes)
+  
+  # Agrégation du jeu d'entraînement par commune
+  train_aggr <- train_data %>%
+    group_by(INSEE_COM) %>%
+    summarise(
+      across(all_of(num_vars), ~mean(.x, na.rm = TRUE)),
+      across(all_of(cat_vars), ~as.character(names(which.max(table(.))))),
+      .groups = "drop"
+    )
+  
+  # Ajouter la variable cible agrégée
+  y_aggr <- train_data %>%
+    group_by(INSEE_COM) %>%
+    summarise(value = mean(.data[[name]], na.rm = TRUE)) %>%
+    pull(value)
+  train_aggr[[name]] <- y_aggr
+  
+  # Conversion des types
+  train_aggr[cat_vars] <- lapply(train_aggr[cat_vars], factor)
+  train_aggr[num_vars] <- lapply(train_aggr[num_vars], as.numeric)
+  
+  # Création de la tâche mlr
+  rf_task <- makeRegrTask(data = train_aggr[, c(name, cov_brt[-1])], target = name)
+  res_tune <- tuneRanger(rf_task, num.trees = ntree, iters = 100, num.threads = 4)
+  
+  # Entraînement du modèle sur les communes agrégées
+  rf_model <- ranger(
+    formula = as.formula(paste0(name, " ~ .")),
+    data = train_aggr[, c(name, cov_brt[-1])],
+    num.trees = ntree,
+    mtry = res_tune$recommended.pars$mtry,
+    min.node.size = res_tune$recommended.pars$min.node.size,
+    importance = "permutation",
+    keep.inbag = FALSE
+  )
+  
+  # Prédiction sur les données ponctuelles du fold
+  test <- test_data[, cov_brt[-1]]
+  test[cat_vars] <- lapply(test[cat_vars], factor)
+  test[num_vars] <- lapply(test[num_vars], as.numeric)
+  
+  # Harmonisation des niveaux des facteurs
+  for (v in cat_vars) {
+    levels_train <- levels(train_aggr[[v]])
+    test[[v]] <- factor(test[[v]], levels = levels_train)
+  }
+  
+  preds <- predict(rf_model, data = test, num.threads = kmax)$predictions
+  preds <- round(preds, 2)
+  
+  datacov$predRF_aggrcom[which(datacov$INSEE_COM %in% test_communes)] <- preds
+  
+  return(data.frame(fold = i, pred = preds, obs = test_data[[name]]))
+}
+
+# Évaluation finale
+resuXvalRF_aggrcom <- Myeval(datacov$predRF_aggrcom, datacov[[name]])
+resuXvalRF_aggrcom
 
 
