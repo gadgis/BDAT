@@ -66,7 +66,7 @@ for (n in sample_sizes) {
   
   resu_rep <- foreach(rep = 1:repets, .combine = rbind,
                       .packages = c("INLA", "inlabru", "sp", "dplyr", "sf"),
-                      .export = c("Myeval","matern","preds_RF"))%dopar% {
+                      .export = c("Myeval","matern","preds_RF"))%dop% {
                         set.seed(rep)
                         
                         data_sample <- datacov %>% sample_n(n)

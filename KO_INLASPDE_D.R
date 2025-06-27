@@ -28,10 +28,10 @@ repets <- 5
 NomsCoord <- c("x", "y")
 
 # Données----
-dtTB<-("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat.rds")
+dtTB<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat.rds")
 datacov <- dtTB %>%
-  mutate(identifiant = ifelse(source == "IGCS", id_profil, bdatid)) %>%
-  select(all_of(c(name, NomsCoord, "INSEE_COM", "source", "identifiant"))) %>%
+  dplyr::mutate(identifiant = ifelse(source == "IGCS", id_profil, bdatid)) %>%
+  dplyr::select(all_of(c(name, NomsCoord, "INSEE_COM", "source", "identifiant"))) %>%
   na.omit()
 
 # Définir le champ spde----
@@ -61,7 +61,7 @@ for (n in sample_sizes) {
   k <- ceiling(n / indiv_per_fold)
   
   resu_rep <- foreach(rep = 1:repets, .packages = c("INLA", "inlabru", "sp", "dplyr", "sf"),
-                      .export = c("Myeval")) %dopar% {
+                      .export = c("Myeval","matern")) %do% {
     set.seed(rep)
     
                         ##Echantillonage----
