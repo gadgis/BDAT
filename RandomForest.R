@@ -89,7 +89,7 @@ fomula.ranger <- as.formula(paste0(name,"~."))
 RF_Mod.G <- ranger(formula = fomula.ranger ,
                     data = datacov_shrt,
                     num.trees = ntree,
-                    min.node.size = res$recommended.pars$mtry ,
+                    min.node.size = res$recommended.pars$min.node.size ,
                     quantreg = F,
                     max.depth = 15, 
                     mtry=res$recommended.pars$mtry ,
@@ -197,7 +197,7 @@ resuXval <-
                                 data = datacov_shrt[-nblignes  , ],
                                 num.trees = ntree,
                                 mtry=res$recommended.pars$mtry ,
-                                min.node.size = res$recommended.pars$mtry ,
+                                min.node.size = res$recommended.pars$min.node.size ,
 
                                 quantreg = FALSE,
                                 max.depth = 15,
