@@ -161,7 +161,7 @@ for (n in sample_sizes) {
     folds <- split(datacov_sample$id, rep(1:k, length.out = n))
   
     
-    datacov_sample$predRF <- NA
+  
     
     print("Validation croisée----------------")
     

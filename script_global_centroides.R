@@ -185,7 +185,7 @@ resuXvalpredINLAKED
 
 ## Carte
 
-qrf =   rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pHqrf_centroides.tif")
+qrf =   rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/moy_pHqrf_centroides.tif")
 koINLA =   rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKOINLA_centroides.tif")
 kedINLA =   rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKEDINLA_centroides.tif")
 
@@ -232,4 +232,6 @@ plot(predstack)
 # tm_shape(predstack[[3]]) + tm_raster(style="quantile" , n=8)
 # tmap_mode("plot")
 
-
+writeRaster(qrf, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pHqrf_centroides_final.tif", overwrite = TRUE)
+writeRaster(koINLA, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKOINLA_centroides_final.tif", overwrite = TRUE)
+writeRaster(kedINLA, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKEDINLA_centroides_final.tif", overwrite = TRUE)
