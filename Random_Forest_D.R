@@ -70,8 +70,8 @@ Myeval <- function(x, y){
 name="pH"
 kmax= 23 # pour la parallelisation, le nb de coeurs
 ntree = 350 # le nbre d'arbre de random forest
-sample_sizes <- c(600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 3000, 4000, 5000,6000,7000,8000,9000,10000)
-repets <- 100
+sample_sizes <- c(600, 800)
+repets <- 5
 NomsCoord <- c("x","y")
 
 
@@ -145,6 +145,12 @@ for (n in sample_sizes) {
     datacov_sample <- datacov %>% sample_n(n)
     datacov_sample_shrt <- datacov_sample[, cov_brt]
     
+    datacov_sample$id <- 1:nrow(datacov_sample)
+    folds <- split(datacov_sample$id, rep(1:k, length.out = n))
+    
+    
+  
+    
     
     #tune des hyperparamètres
     if (rep == 1) {
@@ -155,13 +161,7 @@ for (n in sample_sizes) {
     
     
     # Validation croisée
-    datacov_sample$id <- 1:nrow(datacov_sample)
-    
-    
-    folds <- split(datacov_sample$id, rep(1:k, length.out = n))
-  
-    
-  
+
     
     print("Validation croisée----------------")
     
@@ -171,7 +171,7 @@ for (n in sample_sizes) {
     for (i in 1:k) {
       print(i)
       
-      nblignes = which( datacov_sample$id %in% datacov_sample$id[ folds[[i]] ] )
+      nblignes = which( datacov_sample$id %in%  folds[[i]] )
     
       #Calibre le modèle
       fomula.ranger <- as.formula(paste0(name,"~."))

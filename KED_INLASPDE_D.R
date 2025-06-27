@@ -23,8 +23,8 @@ Myeval <- function(x, y){
 
 # Paramètres
 name <- "pH"
-sample_sizes <- c(600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 3000, 4000, 5000,6000,7000,8000,9000,10000)
-repets <- 100
+sample_sizes <- c(600, 8000)
+repets <- 5
 NomsCoord <- c("x", "y")
 
 # Données
@@ -32,8 +32,8 @@ dtTB <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat.rds"
 preds_RF <- readRDS("predictions_RF_Degradation.rds")
 
 datacov <- dtTB %>%
-  mutate(identifiant = ifelse(source == "IGCS", id_profil, bdatid)) %>%
-  select(all_of(c(name, NomsCoord, "INSEE_COM", "source", "identifiant"))) %>%
+  dplyr::mutate(identifiant = ifelse(source == "IGCS", id_profil, bdatid)) %>%
+  dplyr::select(all_of(c(name, NomsCoord, "INSEE_COM", "source", "identifiant"))) %>%
   na.omit()
 
 registerDoParallel(cores = parallel::detectCores() - 1)

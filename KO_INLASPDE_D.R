@@ -23,8 +23,8 @@ Myeval <- function(x, y){
 
 # Paramètres
 name <- "pH"
-sample_sizes <- c(600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 3000, 4000, 5000,,6000,7000,8000,9000,10000)
-repets <- 100
+sample_sizes <- c(600, 800)
+repets <- 5
 NomsCoord <- c("x", "y")
 
 # Données
