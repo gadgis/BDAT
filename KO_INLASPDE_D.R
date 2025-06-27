@@ -9,7 +9,7 @@ library(doParallel)
 library(purrr)
 library(terra)
 
-# Fonction d'évaluation
+# Fonction d'évaluation----
 Myeval <- function(x, y){
   ME <- round(mean(y - x, na.rm = TRUE), 2)
   RMSE <- round(sqrt(mean((y - x)^2, na.rm = TRUE)), 2)
@@ -21,19 +21,37 @@ Myeval <- function(x, y){
   data.frame(ME = ME, MAE = MAE, RMSE = RMSE, r2 = r2, NSE = NSE)
 }
 
-# Paramètres
+# Paramètres----
 name <- "pH"
 sample_sizes <- c(600, 800)
 repets <- 5
 NomsCoord <- c("x", "y")
 
-# Données
+# Données----
 dtTB<-("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat.rds")
 datacov <- dtTB %>%
   mutate(identifiant = ifelse(source == "IGCS", id_profil, bdatid)) %>%
   select(all_of(c(name, NomsCoord, "INSEE_COM", "source", "identifiant"))) %>%
   na.omit()
 
+# Définir le champ spde----
+coords <- datacov[, NomsCoord]
+
+mesh3 <- inla.mesh.2d(
+  loc = coords,
+  max.edge = c(1, 2) * diff(range(coords[,1])) / (3*5),
+  offset = c(diff(range(coords[,1])) / (3*5), diff(range(coords[,1])) / 3),
+  cutoff = diff(range(coords[,1])) / (3*5*10)
+)
+
+matern <- inla.spde2.pcmatern(
+  mesh = mesh3,
+  alpha = 2,
+  prior.range = c(500, 0.01),
+  prior.sigma = c(10, 0.01)
+)
+
+#Boucle sur les tailles d'échantillon----
 registerDoParallel(cores = parallel::detectCores() - 1)
 results_all <- list()
 
@@ -46,30 +64,23 @@ for (n in sample_sizes) {
                       .export = c("Myeval")) %dopar% {
     set.seed(rep)
     
+                        ##Echantillonage----
     data_sample <- datacov %>% sample_n(n)
     data_sample$id <- 1:nrow(data_sample)
+    
+    ##Définit les folds----
+    
     folds <- split(data_sample$id, rep(1:k, length.out = n))
+    
     data_sample$elt <- data_sample[[name]]
     data_sample$predINLAKO <- NA
     
-    coords <- data_sample[, NomsCoord]
-    
-    mesh3 <- inla.mesh.2d(
-      loc = coords,
-      max.edge = c(1, 2) * diff(range(coords[,1])) / (3*5),
-      offset = c(diff(range(coords[,1])) / (3*5), diff(range(coords[,1])) / 3),
-      cutoff = diff(range(coords[,1])) / (3*5*10)
-    )
-    
-    matern <- inla.spde2.pcmatern(
-      mesh = mesh3,
-      alpha = 2,
-      prior.range = c(500, 0.01),
-      prior.sigma = c(10, 0.01)
-    )
-    
     coordinates(data_sample) <- NomsCoord
     proj4string(data_sample) <- CRS("epsg:2154")
+    
+    ##Validation croisée----
+    
+    data_sample$predINLAKO <- NA
     
     for (i in 1:k) {
       data_sample$elt[folds[[i]]] <- NA
@@ -97,6 +108,7 @@ for (n in sample_sizes) {
   results_all[[as.character(n)]] <- resu_rep
 }
 
+#Fin cluster paral----
 stopImplicitCluster()
 
 results_metrics <- bind_rows(results_all)

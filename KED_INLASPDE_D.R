@@ -9,7 +9,7 @@ library(doParallel)
 library(purrr)
 library(terra)
 
-# Fonction d'évaluation
+# Fonction d'évaluation----
 Myeval <- function(x, y){
   ME <- round(mean(y - x, na.rm = TRUE), 2)
   RMSE <- round(sqrt(mean((y - x)^2, na.rm = TRUE)), 2)
@@ -21,13 +21,13 @@ Myeval <- function(x, y){
   data.frame(ME = ME, MAE = MAE, RMSE = RMSE, r2 = r2, NSE = NSE)
 }
 
-# Paramètres
+# Paramètres----
 name <- "pH"
-sample_sizes <- c(600, 8000)
+sample_sizes <- c(600, 800)
 repets <- 5
 NomsCoord <- c("x", "y")
 
-# Données
+# Données----
 dtTB <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat.rds")
 preds_RF <- readRDS("predictions_RF_Degradation.rds")
 
@@ -36,6 +36,26 @@ datacov <- dtTB %>%
   dplyr::select(all_of(c(name, NomsCoord, "INSEE_COM", "source", "identifiant"))) %>%
   na.omit()
 
+#définir le champ spde----
+
+coords <- datacov[, NomsCoord]
+
+mesh3 <- inla.mesh.2d(
+  loc = coords,
+  max.edge = c(1, 2) * diff(range(coords[,1])) / (3*5),
+  offset = c(diff(range(coords[,1])) / (3*5), diff(range(coords[,1])) / 3),
+  cutoff = diff(range(coords[,1])) / (3*5*10)
+)
+
+matern <- inla.spde2.pcmatern(
+  mesh = mesh3,
+  alpha = 2,
+  prior.range = c(500, 0.01),
+  prior.sigma = c(10, 0.01)
+)
+
+
+#Boucle sur les tailles d'échantillon----
 registerDoParallel(cores = parallel::detectCores() - 1)
 results_all <- list()
 
@@ -46,7 +66,7 @@ for (n in sample_sizes) {
   
   resu_rep <- foreach(rep = 1:repets, .combine = rbind,
                       .packages = c("INLA", "inlabru", "sp", "dplyr", "sf"),
-                      .export = c("Myeval"))%dopar% {
+                      .export = c("Myeval","matern","preds_RF"))%dopar% {
                         set.seed(rep)
                         
                         data_sample <- datacov %>% sample_n(n)
@@ -54,31 +74,19 @@ for (n in sample_sizes) {
                         folds <- split(data_sample$id, rep(1:k, length.out = n))
                         data_sample$elt <- data_sample[[name]]
                         
-                        # Récupérer les prédictions RF pour la réplication et la taille courante
-                        rfpred <- preds_RF %>%
+                        ## Récupérer les prédictions RF pour la réplication et la taille courante----
+                        prediction <- preds_RF %>%
                           filter(rep == rep, sample_size == n) %>%
                           select(identifiant, predRF)
                         
-                        data_sample <- left_join(data_sample, rfpred, by = "identifiant")
+                        data_sample <- left_join(data_sample, prediction, by = "identifiant")
                         
-                        coords <- data_sample[, NomsCoord]
-                        
-                        mesh3 <- inla.mesh.2d(
-                          loc = coords,
-                          max.edge = c(1, 2) * diff(range(coords[,1])) / (3*5),
-                          offset = c(diff(range(coords[,1])) / (3*5), diff(range(coords[,1])) / 3),
-                          cutoff = diff(range(coords[,1])) / (3*5*10)
-                        )
-                        
-                        matern <- inla.spde2.pcmatern(
-                          mesh = mesh3,
-                          alpha = 2,
-                          prior.range = c(500, 0.01),
-                          prior.sigma = c(10, 0.01)
-                        )
-                        
+                        ##prepare le sp pour inlabru----
                         coordinates(data_sample) <- NomsCoord
                         proj4string(data_sample) <- CRS("epsg:2154")
+                        
+                        ##Validation croisée----
+                        
                         data_sample$predINLAKED <- NA
                         
                         for (i in 1:k) {
@@ -106,6 +114,7 @@ for (n in sample_sizes) {
   results_all[[as.character(n)]] <- resu_rep
 }
 
+#fin cluster----
 stopImplicitCluster()
 
 results_metrics <- bind_rows(results_all)
