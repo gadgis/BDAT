@@ -74,37 +74,48 @@ res$recommended.pars$min.node.size
 
 
 
+# fomula.ranger <- as.formula(paste0(name,"~."))
+# QRF_Mod.G <- ranger(formula = fomula.ranger ,
+#                     data = datacov_shrt,
+#                     num.trees = ntree,
+#                     min.node.size = res$recommended.pars$mtry ,
+#                     quantreg = TRUE,
+#                     max.depth = 15, 
+#                     mtry=res$recommended.pars$mtry ,
+#                     importance="permutation", 
+#                     scale.permutation.importance = TRUE, #division par l'écart-type de la variable (mise des permutations entre 0 et 1)
+#                     keep.inbag = F)
+
 fomula.ranger <- as.formula(paste0(name,"~."))
-QRF_Mod.G <- ranger(formula = fomula.ranger ,
+RF_Mod.G <- ranger(formula = fomula.ranger ,
                     data = datacov_shrt,
                     num.trees = ntree,
-                    min.node.size = res$recommended.pars$mtry ,
-                    quantreg = TRUE,
+                    min.node.size = res$recommended.pars$min.node.size ,
+                    quantreg = FALSE,
                     max.depth = 15, 
                     mtry=res$recommended.pars$mtry ,
                     importance="permutation", 
                     scale.permutation.importance = TRUE, #division par l'écart-type de la variable (mise des permutations entre 0 et 1)
                     keep.inbag = F)
-
 #Variable importance
-Imp_QRF <- data.frame(QRF_Mod.G$variable.importance)
-Imp_QRF$Vars <- row.names(Imp_QRF)
-Imp_QRF <- Imp_QRF[order(Imp_QRF$QRF_Mod.G.variable.importance,decreasing = T),]
-
-varimp <- ggplot(Imp_QRF, 
-                 aes(x=reorder(Vars, QRF_Mod.G.variable.importance),
-                     y=QRF_Mod.G.variable.importance #,  color=as.factor(var_categ)
-                 )
-) + 
-  geom_point() +
-  geom_segment(aes(x=Vars,xend=Vars,y=0,yend=QRF_Mod.G.variable.importance)) +
-  scale_color_discrete(name="Variable Group") +
-  ylab("IncNodePurity") +
-  xlab("Variable Name") +
-  ggtitle(name)+
-  coord_flip()
-
-print(varimp)
+Imp_RF <- data.frame(RF_Mod.G$variable.importance)
+Imp_RF$Vars <- row.names(Imp_RF)
+Imp_RF <- Imp_RF[order(Imp_RF$RF_Mod.G.variable.importance,decreasing = T),]
+# 
+# varimp <- ggplot(Imp_RF, 
+#                  aes(x=reorder(Vars, RF_Mod.G.variable.importance),
+#                      y=RF_Mod.G.variable.importance #,  color=as.factor(var_categ)
+#                  )
+# ) + 
+#   geom_point() +
+#   geom_segment(aes(x=Vars,xend=Vars,y=0,yend=RF_Mod.G.variable.importance)) +
+#   scale_color_discrete(name="Variable Group") +
+#   ylab("IncNodePurity") +
+#   xlab("Variable Name") +
+#   ggtitle(name)+
+#   coord_flip()
+# 
+# print(varimp)
 
 # Predictions
 
@@ -117,20 +128,22 @@ testD <- gXY %>%
 
 
 
-QRF_Median <- predict(QRF_Mod.G,
+# QRF_Median <- predict(QRF_Mod.G,
+#                       testD,
+#                       type = "quantiles",
+#                       quantiles =  c(0.05,0.5,0.95),
+#                       num.threads = kmax )$predictions
+
+QRF_Median2 <- predict(RF_Mod.G,
                       testD,
-                      type = "quantiles",
-                      quantiles =  c(0.05,0.5,0.95),
                       num.threads = kmax )$predictions
-
-
 
 QRF_Median50 <- bind_cols(gXY %>%
                             filter_at(vars(cov_brt[-1]),
                                       all_vars(!is.na(.))
                             ) %>%
                             dplyr::select(x,y)     ,
-                          QRF_Median = QRF_Median[,2])
+                          QRF_Median = QRF_Median2)
 
 r <- rast(QRF_Median50, type="xyz")
 
@@ -139,49 +152,47 @@ terra::writeRaster(r,file=paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resulta
 
 # k fold -------------
 
-print("Validation croisée----------------")
+# print("Validation croisée----------------")
 
 datacov$predRF <- NA
 
 
-resuXval <- 
+resuXval <-
   foreach(i = 1:k,
           .errorhandling='pass' ) %do% {
-            
+
             print(i)
-            
+
             # collecter les # des lignes (gérer les doublons)
             nblignes = which( datacov$id %in% datacov$id[ fold[[i]] ] )
-            
-            QRF_Mod.G <- ranger(formula = fomula.ranger ,
+
+            RF_Mod.G <- ranger(formula = fomula.ranger ,
                                 data = datacov_shrt[-nblignes  , ],
                                 num.trees = ntree,
                                 mtry=res$recommended.pars$mtry ,
-                                min.node.size = res$recommended.pars$mtry ,
-                                
-                                quantreg = TRUE,
-                                max.depth = 15, 
-                                importance="permutation", 
+                                min.node.size = res$recommended.pars$min.node.size ,
+
+                                quantreg = FALSE,
+                                max.depth = 15,
+                                importance="permutation",
                                 scale.permutation.importance = FALSE, #division par l'écart-type de la variable (mise des permutations entre 0 et 1)
                                 keep.inbag = F)
-            
-            
-            datacov$predRF[ nblignes ] <- predict(QRF_Mod.G,
+
+
+            datacov$predRF[ nblignes ] <- predict(RF_Mod.G,
                                                   datacov_shrt[ nblignes , ],
-                                                  type = "quantiles",
-                                                  quantiles =  c(0.5),
                                                   num.threads = kmax )$prediction
-            
-            datacov$predRF  <- as.numeric(datacov$predRF)     # force numérique
-            datacov[[name]] <- as.numeric(datacov[[name]])    # force numérique
-            
-            good <- !is.na(datacov$predRF) & !is.na(datacov[[name]])  # lignes complètes
-            
-            
-            
+
+            # datacov$predRF  <- as.numeric(datacov$predRF)     # force numérique
+            # datacov[[name]] <- as.numeric(datacov[[name]])    # force numérique
+            #
+            # good <- !is.na(datacov$predRF) & !is.na(datacov[[name]])  # lignes complètes
+            #
+
+
           }
 
-resuXvalQRF <- Myeval(datacov$predRF[good], datacov[[name]][good])
+resuXvalQRF <- Myeval(datacov$predRF, datacov[,name])
 
 resuXvalQRF
 
