@@ -13,20 +13,18 @@ library(caret) # modelisation creation de modeles prédictifs avec tuning valida
 library(foreach) # boucles optimisées de R plus facile à coder voir option combine
 library(raster) # manipuler des données raster
 library(purrr)
-
-library(gstlearn) # géostatistique
 library(ggpubr) # pour les graphiques
 library(ggnewscale)
 library(doParallel)
-
 library(raster) # copie de terra mais pour le package OGC
 library(tuneRanger)
-
 # INLA SPDE avec inla bru, approche bayesienne de la géostatistique
 library(INLA)
 library(inlabru)
+library(iml)
+library(mlr)
 
-#Fonction de cal des indicarteurs
+
 ## Fonction utilsée pour la validation --------------
 
 Myeval <- function(x, y){
@@ -72,22 +70,20 @@ Myeval <- function(x, y){
   return(evalRes)
 }
 
-name="pH"
-kmax= detectCores()-1  # pour la parallelisation, le nb de coeurs
-ntree = 350 # le nbre d'arbre de random forest
-nbOGC = 5 # le nombre de pseudo covariables oblique
-
-
-nsim=100 # for bayesian inla simulation
-
-
-NomsCoord <- c("x","y")
-
 setwd("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R")
 
-#Chargement des données
+## Définition des variables ------
 
-# Preparation des données pour la spatialisation
+name="pH"
+kmax= 23 # pour la parallelisation, le nb de coeurs
+ntree = 350 # le nbre d'arbre de random forest
+k=10 # pour la k fold cross validation
+nsim=100 # for bayesian inla simulation
+NomsCoord <- c("x","y")
+sample_sizes <- c(600,800,1000,1200,1400,1600,1800,2000,3000,4000,5000,6000,7000,8000,9000,10000) 
+repets <- 30
+
+# 1 Preparation des données pour la spatialisation
 #Extraction des matrices de covariables pour les données ponctuelles----
 
 chemin_cov<- "Y:/BDAT/traitement_donnees/MameGadiaga/data/Covariates_MAall"
@@ -96,52 +92,88 @@ chemin_cov<- "Y:/BDAT/traitement_donnees/MameGadiaga/data/Covariates_MAall"
 l<- list.files(chemin_cov, pattern = ".tif$", full.names = TRUE)
 
 st <- rast(l)
-rast_za <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rast_za.tif")
-plot(st)
-rmqs<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/RMQS_pH.rds")
-
-# prepare covar into a table from the stack r1
-gXY <- as.data.frame(st , xy=TRUE) %>%
-  na.omit( )
 
 
 dtTB <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat.rds")
 
-
-# attribution d'un id par sites (pour les doublons analytique possible)
+# Extraction covariables
 datacov <- terra::extract( st , 
                            dtTB %>%
                              st_as_sf(coords = NomsCoord ,
                                       crs = 2154)
-) %>% 
+                           ) %>% 
   bind_cols(dtTB %>%
               dplyr::select(all_of(c( name,NomsCoord,"source")  )
-              )
-  ) %>%
-  
+                            )
+            ) %>%
+
   mutate(id = row_number()) %>%
   na.omit()
-
-colnames(datacov)
 
 # spécifier les numéro des colonnes pour les covariables et la variable
 idcovs = 2:65
 idvar = 66
 
-# Paramètres RF
-X <- datacov[, idcovs]
-Y <- datacov[, idvar]
-
-# Chargement des covariables sélectionnées (Boruta)
-cov_brt <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pH_cov_brt.rds")
-cov_brt <- c(name, cov_brt)
-
-# Paramètres globaux
-repets <- 3
-sample_sizes <- c(600, 800)
-
+# Initialisation du stockage
 results_all <- list()
 
-source("Random_Forest_D.R")
+#Boucle principale
+for (n in sample_sizes) {
+  cat(">> Taille d'échantillon :", n, "\n")
+  k <- ifelse(n <= 2000, ceiling(n / 200), ceiling(n / 500))
+  
+  for (rep in 1:repets) {
+    cat("  → Répétition :", rep, "\n")
+    set.seed(rep)
+    
+    # Sous-échantillonnage
+    data_sample <- datacov %>% dplyr::sample_n(n)
+    data_sample$id <- 1:nrow(data_sample)
+    
+    # Création des folds
+    fold <- split(data_sample$id, rep(1:k, length.out = n))
+    
+    # Random Forest 
+    source("Random_Forest_D.R")  
+    
+    # Préparation unique de dataINLA pour les deux krigeages
+    dataINLA <- data_sample[, c(NomsCoord, name,"predRF")]
+    dataINLA$activ <- dataINLA[[name]]
+     
+  
+    coordinates(dataINLA) <- NomsCoord
+    proj4string(dataINLA) <- CRS("epsg:2154")
+    
+    coords <- data_sample[, NomsCoord]  # pour le maillage
+    
+    # INLA KO
+    source("KO_INLASPDE_D.R") 
+    
+    # INLA KED
+    source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KED_INLASPDE_D.R")  
+    
+    # Ajout des métadonnées
+    res_rf$method <- "RF"
+    res_ko$method <- "INLA_KO"
+    res_ked$method <- "INLA_KED"
+    
+    # Compilation
+    res_all <- bind_rows(res_rf, res_ko, res_ked) %>%
+      mutate(rep = rep, sample_size = n)
+    
+    results_all[[paste0(n, "_", rep)]] <- res_all
+  }
+}
 
-write.csv(results_df, "resultats_degradation_validation.csv", row.names = FALSE)
+results_final <- bind_rows(results_all)
+
+results_summary <- results_final %>%
+  group_by(sample_size, method) %>%
+  summarise(across(c(ME, MAE, RMSE, r, r2, NSE, rhoC, Cb), mean, na.rm = TRUE), .groups = "drop")
+
+results_summary<-results_summary %>%
+  mutate(across(c(ME, MAE, RMSE, r, r2, NSE, rhoC, Cb), round, digits = 2))
+
+saveRDS(results_summary, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/resultats_degradation_pH.rds")
+
+
