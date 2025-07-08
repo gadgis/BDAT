@@ -204,7 +204,7 @@ results_summary <- results_final %>%
 
 # 7. Sauvegarde des résultats----
 
-saveRDS(results_summary, paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/resultats_degradation_", name, ".rds"))
+saveRDS(results_summary, paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/resultats_degradation_cent", name, ".rds"))
 
 # 8. Graphiques----
 
