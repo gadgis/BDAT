@@ -118,22 +118,22 @@ prepare_dataINLA <- function(type, approach, data_train, data_test, name) {
 
 # Paramètres
 name <- "arg"
-kmax <- 23
+kmax <- 10
 ntree <- 350
 NomsCoord <- c("x", "y")
 sample_sizes <- c(600,800,1000,1200,1300,1400,1600,1800,2000,3000,4000,5000,6000,7000,7600)
 repets <- 30
 types_validation <- c("Classique", "Spatiale")
-
+drive = "/media/communs_infosol/" # ou "Y:/"
 #3. Chargement des données---- 
 
 com <- st_read("Y:/BDAT/traitement_donnees/MameGadiaga/data/commune_53.shp") 
 centroides_communes <- st_centroid(com) %>% dplyr::select(INSEE_COM, X = X_CENTROID, Y = Y_CENTROID) %>% st_drop_geometry()
 
-datacov <- readRDS(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/donnees_ponctuelles", name, ".rds"))
-moyenne_covariable <- readRDS(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/moyenne_covariable", name, ".rds"))
+datacov <- readRDS(paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/donnees_ponctuelles", name, ".rds"))
+moyenne_covariable <- readRDS(paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/moyenne_covariable", name, ".rds"))
 
-cov_brt <- readRDS(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "_cov_brt.rds"))
+cov_brt <- readRDS(paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/", name, "_cov_brt.rds"))
 
 #4. RF pour la validation croisée avec dégradation----
 
@@ -162,6 +162,7 @@ for (n in sample_sizes) {
       }
       
       for (fold_idx in 1:k) {
+        
         cat("   > Fold", fold_idx, "sur", k, "\n")
       
         if (type_val == "Classique") {
@@ -207,6 +208,8 @@ for (n in sample_sizes) {
         )
       }
     }
+    
+    
   }
 }
 

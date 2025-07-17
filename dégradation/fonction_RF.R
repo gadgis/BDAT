@@ -19,7 +19,9 @@ run_rf <- function(approach = c("Ponctuelle", "Centroide"),
   
   # Apprentissage
   rf_task <- makeRegrTask(data = data_train[, c(name, cov_brt)], target = name)
-  res_tune <- tuneRanger(rf_task, num.trees = ntree, iters = 100, num.threads = 4)
+  res_tune <- tuneRanger(rf_task, 
+                         num.trees = ntree, iters = 100,
+                         num.threads = kmax)
   
   rf_model <- ranger(
     formula = as.formula(paste0(name, " ~ .")),
