@@ -11,28 +11,30 @@
 #1. Chargement des packages----
 
 library(sf)
-library(tmap)
+# library(tmap)
 library(readxl)
 library(tidyr)
+library(dplyr)
 library(foreach)
 library(raster)
 library(purrr)
-library(ggpubr)
-library(ggnewscale)
-library(doParallel)
+# library(ggpubr)
+# library(ggnewscale)
+# library(doParallel)
 library(tuneRanger)
 library(INLA)
 library(inlabru)
 library(iml)
 library(mlr)
+library(caret)
 
-setwd("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R")
+# setwd("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R")
 
 #2. Chargement des fonctions RF, INLA  Myeval et dataINLA----
 
-source("fonction_RF.R")
+source("dégradation/fonction_RF.R")
 
-source("fonction_inla.R")
+source("dégradation/fonction_inla.R")
 
 #Myeval
 Myeval <- function(x, y){
@@ -121,13 +123,14 @@ name <- "arg"
 kmax <- 10
 ntree <- 350
 NomsCoord <- c("x", "y")
-sample_sizes <- c(600,800,1000,1200,1300,1400,1600,1800,2000,3000,4000,5000,6000,7000,7600)
-repets <- 30
+sample_sizes <- c(600,7600 ) # c(600,800,1000,1200,1300,1400,1600,1800,2000,3000,4000,5000,6000,7000,7600)
+repets <- 2
 types_validation <- c("Classique", "Spatiale")
 drive = "/media/communs_infosol/" # ou "Y:/"
+
 #3. Chargement des données---- 
 
-com <- st_read("Y:/BDAT/traitement_donnees/MameGadiaga/data/commune_53.shp") 
+com <- st_read( paste0(drive, "BDAT/traitement_donnees/MameGadiaga/data/commune_53.shp") )
 centroides_communes <- st_centroid(com) %>% dplyr::select(INSEE_COM, X = X_CENTROID, Y = Y_CENTROID) %>% st_drop_geometry()
 
 datacov <- readRDS(paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/donnees_ponctuelles", name, ".rds"))
@@ -215,11 +218,11 @@ for (n in sample_sizes) {
 
 # Fusion de toutes les prédictions RF
 pred_RF_full <- bind_rows(results_rf_all)
-saveRDS(pred_RF_full, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pred_RF_full.rds")
+saveRDS(pred_RF_full, "output/pred_RF_full.rds")
 
 # Fusion de toutes les métriques RF
 metrics_RF_full <- bind_rows(results_rf_all_metrics)
-saveRDS(metrics_RF_full, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrics_RF_full.rds")
+saveRDS(metrics_RF_full, "output/metrics_RF_full.rds")
 
 #5. INLA pour la validation croisée avec dégradation----
 
@@ -319,7 +322,7 @@ for (n in sample_sizes) {
 
 # Fusion des métriques INLA
 metrics_INLA_full <- bind_rows(results_inla_all_metrics)
-saveRDS(metrics_INLA_full, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrics_INLA_full.rds")
+saveRDS(metrics_INLA_full, "output/metrics_INLA_full.rds")
 
 pred_INLA_full <- bind_rows(results_inla_all_preds)
-saveRDS(pred_INLA_full, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pred_INLA_full.rds")
+saveRDS(pred_INLA_full, "output/pred_INLA_full.rds")
