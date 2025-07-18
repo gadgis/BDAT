@@ -120,11 +120,11 @@ prepare_dataINLA <- function(type, approach, data_train, data_test, name) {
 
 # Paramètres
 name <- "arg"
-kmax <- 10
+kmax <- 30
 ntree <- 350
 NomsCoord <- c("x", "y")
-sample_sizes <- c(600,7600 ) # c(600,800,1000,1200,1300,1400,1600,1800,2000,3000,4000,5000,6000,7000,7600)
-repets <- 2
+sample_sizes <- c(600,800,1000,1500,2000,3000,4000,6000,7000,7600 ) # c(600,800,1000,1200,1300,1400,1600,1800,2000,3000,4000,5000,6000,7000,7600)
+repets <- 10
 types_validation <- c("Classique", "Spatiale")
 drive = "/media/communs_infosol/" # ou "Y:/"
 
@@ -235,6 +235,7 @@ for (n in sample_sizes) {
   k <- ceiling(nrow(datacov) / 1000)
   
   for (rep in 1:repets) {
+    
     cat("\n---- Répétition :", rep, "----\n")
     
     
@@ -271,14 +272,21 @@ for (n in sample_sizes) {
         calib_points <- calib_pool %>% sample_n(n)
         
         # Extraction des prédictions RF
-        pred_rf_fold <- pred_RF_full %>% filter(sample_size == n, rep == rep, type_val == type_val, fold == fold_idx)
+        pred_rf_fold <- pred_RF_full %>% 
+          filter(sample_size == n, 
+                 rep == rep,
+                 type_val == type_val,
+                 fold == fold_idx
+                 )
+        
         
         pred_col_pc <- if (type_val == "Classique") "predRF_PC" else "predRF_PS"
         pred_col_cc <- if (type_val == "Classique") "predRF_CC" else "predRF_CS"
         
         test_data_rf <- left_join(
           test_data,
-          pred_rf_fold %>% dplyr::select(all_of(c("id", pred_col_pc, pred_col_cc))),
+          pred_rf_fold %>%
+            dplyr::select(all_of(c("id", pred_col_pc, pred_col_cc))),
           by = "id"
         )
         
@@ -287,33 +295,79 @@ for (n in sample_sizes) {
       
         # Exécution INLA
         
-        cat("=> Exécution INLA", type, "-", approach, "\n")
-        res_ko_p <- run_inla_spde_core(prepare_dataINLA("KO", "Ponctuelle", calib_points, test_data, name), test_data, name, "KO", "Ponctuelle", type_val)
+        cat("=> Exécution INLA ", type_val, "\n")
+        res_ko_p <- run_inla_spde_core(prepare_dataINLA(type = "KO",
+                                                        "Ponctuelle", 
+                                                        calib_points, 
+                                                        test_data, 
+                                                        name
+                                                        ),
+                                       test_data, name, 
+                                       "KO", 
+                                       "Ponctuelle", 
+                                       type_val
+                                       )
         
-        cat("=> Exécution INLA", type, "-", approach, "\n")
-        res_ko_c <- run_inla_spde_core(prepare_dataINLA("KO", "Centroide", calib_points, test_data, name), test_data, name, "KO", "Centroide", type_val)
+        res_ko_c <- run_inla_spde_core(prepare_dataINLA("KO", 
+                                                        "Centroide",
+                                                        calib_points,
+                                                        test_data, 
+                                                        name
+                                                        ),
+                                       test_data, 
+                                       name, 
+                                       "KO",
+                                       "Centroide", 
+                                       type_val
+                                       )
         
-        cat("=> Exécution INLA", type, "-", approach, "\n")
-        res_ked_p <- run_inla_spde_core(prepare_dataINLA("KED", "Ponctuelle", calib_data_rf, test_data_rf, name), test_data_rf, name, "KED", "Ponctuelle", type_val)
+        res_ked_p <- run_inla_spde_core(prepare_dataINLA("KED", "Ponctuelle",
+                                                         calib_data_rf, 
+                                                         test_data_rf, name),
+                                        test_data_rf,
+                                        name, 
+                                        "KED",
+                                        "Ponctuelle",
+                                        type_val
+                                        )
         
-        cat("=> Exécution INLA", type, "-", approach, "\n")
-        res_ked_c <- run_inla_spde_core(prepare_dataINLA("KED", "Centroide", calib_data_rf, test_data_rf, name), test_data_rf, name, "KED", "Centroide", type_val)
+        res_ked_c <- run_inla_spde_core(prepare_dataINLA("KED", 
+                                                         "Centroide", 
+                                                         calib_data_rf, 
+                                                         test_data_rf,
+                                                         name), 
+                                        test_data_rf, 
+                                        name,
+                                        "KED", 
+                                        "Centroide", 
+                                        type_val
+                                        )
       
         
         # Stockage des prédictions INLA
         results_inla_all_preds[[length(results_inla_all_preds) + 1]] <- bind_rows(
-          res_ko_p$detail %>% mutate(approach = "Ponctuelle", method = "INLA_KO", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx),
-          res_ko_c$detail %>% mutate(approach = "Centroide", method = "INLA_KO", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx),
-          res_ked_p$detail %>% mutate(approach = "Ponctuelle", method = "INLA_KED", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx),
-          res_ked_c$detail %>% mutate(approach = "Centroide", method = "INLA_KED", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx)
+          res_ko_p$detail %>%
+            mutate(approach = "Ponctuelle",
+                   method = "INLA_KO", 
+                   type_val = type_val, sample_size = n, rep = rep, fold = fold_idx),
+          res_ko_c$detail %>%
+            mutate(approach = "Centroide", method = "INLA_KO", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx),
+          res_ked_p$detail %>%
+            mutate(approach = "Ponctuelle", method = "INLA_KED", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx),
+          res_ked_c$detail %>%
+            mutate(approach = "Centroide", method = "INLA_KED", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx)
         )
         
         # Stockage des métriques INLA
         results_inla_all_metrics[[length(results_inla_all_metrics) + 1]] <- bind_rows(
-          res_ko_p$evaluation %>% mutate(approach = "Ponctuelle", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx),
-          res_ko_c$evaluation %>% mutate(approach = "Centroide", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx),
-          res_ked_p$evaluation %>% mutate(approach = "Ponctuelle", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx),
-          res_ked_c$evaluation %>% mutate(approach = "Centroide", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx)
+          res_ko_p$evaluation %>% 
+            mutate(approach = "Ponctuelle", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx),
+          res_ko_c$evaluation %>% 
+            mutate(approach = "Centroide", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx),
+          res_ked_p$evaluation %>% 
+            mutate(approach = "Ponctuelle", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx),
+          res_ked_c$evaluation %>%
+            mutate(approach = "Centroide", type_val = type_val, sample_size = n, rep = rep, fold = fold_idx)
         )
       }
     }
