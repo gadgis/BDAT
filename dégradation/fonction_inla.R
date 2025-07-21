@@ -45,6 +45,8 @@ run_inla_spde_core <- function(dataINLA, data_test, name,
     options = list(control.inla = list(int.strategy = "eb"), verbose = FALSE)
   )
   
+  gc()
+  
   # Sécurisation de la jointure
   data_test_unique <- data_test[, c("id", name)] %>% distinct(id, .keep_all = TRUE)
   
