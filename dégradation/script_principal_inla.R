@@ -202,7 +202,16 @@ if(calculRF == TRUE) {
           train_aggr <- moyenne_covariable %>%
             inner_join(agg_target, by = "INSEE_COM")
           
-          res_rf_c <- run_rf("Centroide", type_val, train_aggr, test_data, cov_brt, moyenne_covariable, name, ntree, kmax,NomsCoord)
+          res_rf_c <- run_rf("Centroide",
+                             type_val,
+                             train_aggr,
+                             test_data,
+                             cov_brt, 
+                             moyenne_covariable, 
+                             name, 
+                             ntree, 
+                             kmax,NomsCoord
+                             )
           
           # Stockage des prédictions RF
           results_rf_all[[length(results_rf_all) + 1]] <- bind_rows(
