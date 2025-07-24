@@ -13,10 +13,11 @@ run_rf <- function(approach = c("Ponctuelle", "Centroide"),
   type_val <- match.arg(type_val)
   
   # Nom de la colonne de prédiction
-  pred_col <- paste0("predRF_", 
-                     ifelse(approach == "Ponctuelle", "P", "C"),
-                     ifelse(type_val == "Classique", "C", "S"))
-  
+  pred_col <- "pred"
+  # paste0("predRF_", 
+  #                    ifelse(approach == "Ponctuelle", "P", "C"),
+  #                    ifelse(type_val == "Classique", "C", "S"))
+  # 
   # Apprentissage
   rf_task <- makeRegrTask(data = data_train[, c(name, cov_brt)], target = name)
   res_tune <- tuneRanger(rf_task, 
@@ -42,6 +43,7 @@ run_rf <- function(approach = c("Ponctuelle", "Centroide"),
   test <- data_test[, c("id", name, "INSEE_COM", NomsCoord, cov_brt)]
   
   # Prédiction
+  predCal <- rf_model$predictions
   preds <- predict(rf_model, data = test[, cov_brt], num.threads = kmax)$predictions
   preds <- round(preds, 2)
   test[[pred_col]] <- preds
@@ -51,8 +53,9 @@ run_rf <- function(approach = c("Ponctuelle", "Centroide"),
     mutate(method = paste0("RF_", substr(approach, 1, 1), substr(type_val, 1, 1)))
   
   return(list(
-    preds = preds,
+    predCal = predCal, # Pourquoi deux fois preds?????
     evaluation = eval,
     detail = test[, c("id", name, "INSEE_COM", NomsCoord, pred_col)]
-  ))
+    )
+  )
 }

@@ -21,7 +21,10 @@ results_summary <- bind_rows(metrics_INLA_full , metrics_RF_full) %>%
   ) %>%
   mutate(across(c(ME, MAE, RMSE, r, r2, NSE, Cb), round, digits = 4))
 
-results_summaryV <- bind_rows(metrics_INLA_full , metrics_RF_full) %>%
+results_summaryV <- 
+  bind_rows(
+    metrics_INLA_full , metrics_RF_full
+    ) %>%
   mutate(NSE = if_else(NSE<0,0,NSE)) %>%
   
   group_by(sample_size, method) %>%
@@ -55,17 +58,23 @@ Myeval <- function(x, y){
 }
 
 
-tt <- bind_rows(pred_INLA_full , 
+pred_INLA_full <- bind_rows(readRDS("output/Xval1000.rds") , 
+                readRDS("output/Xval4000.rds") ,
+                readRDS("output/Xval7500.rds"), .id = "column_label"
                 
-                pred_RF_full %>%
-                  mutate(method = "RF")
                          ) 
 
 
 tt <- pred_INLA_full %>%
-  group_by(sample_size, method, approach, type_val,rep) %>%
+  pivot_longer(cols =pred:predKED ,
+               names_to = "method",
+               values_to = "pred",
+  ) %>%
+group_by(sample_size, method, approach, type_val,rep) %>%
   
-  group_modify(~Myeval(.$pred,.$obs))
+  group_modify(~Myeval(.$pred,.$obs)) %>%
+  ungroup()
+
 
 results_summary <- tt %>%
   mutate(NSE = if_else(NSE<0,0,NSE)) %>%
@@ -80,7 +89,7 @@ results_summaryV <- tt %>%
   mutate(NSE = if_else(NSE<0,0,NSE)) %>%
   
   group_by(sample_size, method, approach, type_val) %>%
-  summarise(across(c(ME, MAE, RMSE, r, r2, NSE, Cb),
+  dplyr::summarise(across(c(ME, MAE, RMSE, r, r2, NSE, Cb),
                    list(mean,sd), na.rm = TRUE),
             .groups = "drop" 
   ) 
@@ -98,7 +107,7 @@ results_summaryV %>%
   ) %>%
   
   pivot_wider(id_cols = !Indice,names_from = type, values_from = valeur) %>%
-  filter(indice2 %in% c("r2","NSE")) %>%
+  filter(indice2 %in% c("NSE")) %>%
   
   ggplot(
     aes(x = sample_size,
@@ -106,8 +115,8 @@ results_summaryV %>%
     )
   ) +
   
-  geom_ribbon(aes(ymin = mean + 1.96 * sd / 3.16,
-                  ymax = mean - 1.96 * sd / 3.16, 
+  geom_ribbon(aes(ymin = mean + 1.96 * sd / 2.23,
+                  ymax = mean - 1.96 * sd / 2.23, 
                   fill = method), alpha = 0.3)+
   
   geom_line( aes(
@@ -124,7 +133,7 @@ results_summaryV %>%
   ) +
   
   
-  facet_wrap(approach+type_val~indice2, scales= "free") +
+  facet_grid(type_val~approach, scales= "free") +
   labs(
     x = "Taille de l'échantillon (calibration)",
     y = "Indice",
