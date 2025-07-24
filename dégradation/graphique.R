@@ -1,42 +1,42 @@
 library(dplyr)
 library(ggplot2)
-
-metrics_INLA_full <- readRDS("~/bdat/stage_bdat/output/metrics_INLA_full.rds")
-metrics_RF_full <- readRDS("~/bdat/stage_bdat/output/metrics_RF_full.rds")
-
-
-tt <- bind_rows(pred_INLA_full , pred_RF_full ) %>%
-  mutate( diffR = pred - obs ) %>%
-  group_by(sample_size, method, approach, type_val) %>%
-  reframe(res = mean(diffR))
-
-
-
-results_summary <- bind_rows(metrics_INLA_full , metrics_RF_full) %>%
-  mutate(NSE = if_else(NSE<0,0,NSE)) %>%
-  group_by(sample_size, method, approach, type_val) %>%
-  summarise(across(c(ME, MAE, RMSE, r, r2, NSE, Cb), 
-                   mean, na.rm = TRUE),
-            .groups = "drop"
-  ) %>%
-  mutate(across(c(ME, MAE, RMSE, r, r2, NSE, Cb), round, digits = 4))
-
-results_summaryV <- 
-  bind_rows(
-    metrics_INLA_full , metrics_RF_full
-    ) %>%
-  mutate(NSE = if_else(NSE<0,0,NSE)) %>%
-  
-  group_by(sample_size, method) %>%
-  summarise(across(c(ME, MAE, RMSE, r, r2, NSE, Cb),
-                   list(mean,sd), na.rm = TRUE),
-            .groups = "drop" 
-  ) 
-
-
-
-pred_INLA_full <- readRDS("~/bdat/stage_bdat/output/pred_INLA_full.rds")
-pred_RF_full <- readRDS("~/bdat/stage_bdat/output/pred_RF_full.rds")
+library(tidyr)
+# metrics_INLA_full <- readRDS("~/bdat/stage_bdat/output/metrics_INLA_full.rds")
+# metrics_RF_full <- readRDS("~/bdat/stage_bdat/output/metrics_RF_full.rds")
+# 
+# 
+# tt <- bind_rows(pred_INLA_full , pred_RF_full ) %>%
+#   mutate( diffR = pred - obs ) %>%
+#   group_by(sample_size, method, approach, type_val) %>%
+#   reframe(res = mean(diffR))
+# 
+# 
+# 
+# results_summary <- bind_rows(metrics_INLA_full , metrics_RF_full) %>%
+#   mutate(NSE = if_else(NSE<0,0,NSE)) %>%
+#   group_by(sample_size, method, approach, type_val) %>%
+#   summarise(across(c(ME, MAE, RMSE, r, r2, NSE, Cb), 
+#                    mean, na.rm = TRUE),
+#             .groups = "drop"
+#   ) %>%
+#   mutate(across(c(ME, MAE, RMSE, r, r2, NSE, Cb), round, digits = 4))
+# 
+# results_summaryV <- 
+#   bind_rows(
+#     metrics_INLA_full , metrics_RF_full
+#     ) %>%
+#   mutate(NSE = if_else(NSE<0,0,NSE)) %>%
+#   
+#   group_by(sample_size, method) %>%
+#   summarise(across(c(ME, MAE, RMSE, r, r2, NSE, Cb),
+#                    list(mean,sd), na.rm = TRUE),
+#             .groups = "drop" 
+#   ) 
+# 
+# 
+# 
+# pred_INLA_full <- readRDS("~/bdat/stage_bdat/output/pred_INLA_full.rds")
+# pred_RF_full <- readRDS("~/bdat/stage_bdat/output/pred_RF_full.rds")
 
 Myeval <- function(x, y){
   ME <- mean(y - x, na.rm = TRUE)
@@ -59,8 +59,9 @@ Myeval <- function(x, y){
 
 
 pred_INLA_full <- bind_rows(readRDS("output/Xval1000.rds") , 
-                readRDS("output/Xval4000.rds") ,
-                readRDS("output/Xval7500.rds"), .id = "column_label"
+                            readRDS("output/Xval2000.rds") ,
+                            readRDS("output/Xval4000.rds") ,
+                            readRDS("output/Xval7500.rds"), .id = "column_label"
                 
                          ) 
 
@@ -107,7 +108,8 @@ results_summaryV %>%
   ) %>%
   
   pivot_wider(id_cols = !Indice,names_from = type, values_from = valeur) %>%
-  filter(indice2 %in% c("NSE")) %>%
+  filter(indice2 %in% c("RMSE","NSE","Cb")) %>%
+  mutate(sample_size = as.numeric(sample_size)) %>%
   
   ggplot(
     aes(x = sample_size,
@@ -117,30 +119,34 @@ results_summaryV %>%
   
   geom_ribbon(aes(ymin = mean + 1.96 * sd / 2.23,
                   ymax = mean - 1.96 * sd / 2.23, 
-                  fill = method), alpha = 0.3)+
+                  fill = method,
+                  linetype=type_val), alpha = 0.3)+
   
   geom_line( aes(
-    color = method
+    color = method,
+    linetype=type_val
   ) , size = 1) +
   
-  geom_point(aes(color = method) , 
+  geom_point(aes(color = method,
+                 shape=type_val) , 
              size = 2) +
   
   geom_vline(xintercept = 2000, 
+             
              color = "black", 
              linetype = "solid",
              size = 1
   ) +
   
   
-  facet_grid(type_val~approach, scales= "free") +
+  facet_grid(indice2~approach, scales= "free") +
   labs(
     x = "Taille de l'échantillon (calibration)",
     y = "Indice",
     color = "Méthode",
     title = paste("Évolution des indicateurs de la validation croisée (10) \nselon la taille d'échantillon")
   ) +
-  theme_minimal() +
+  theme_bw() +
   theme(
     plot.title = element_text(face = "bold", hjust = 0.5),
     legend.position = "bottom"

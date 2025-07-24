@@ -111,7 +111,7 @@ pred_RF_full <-  foreach(
              ) %do%  {
       cat("\n---- Répétition :", rep, "----\n")
       
-      set.seed(1000 + rep)
+      set.seed(1001 + rep)
       
       foreach (type_val = types_validation,
                .combine = rbind.data.frame
