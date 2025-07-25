@@ -286,7 +286,8 @@ cat("FIN DES CALCULS--------------------")
   # Fusion de toutes les prédictions RF
 saveRDS(pred_RF_full, 
         paste0(
-          "output/Xval",
+          "output/Xval_",
+          name,
           paste0(sample_sizes,collapse = "_") ,
           ".rds")
         )

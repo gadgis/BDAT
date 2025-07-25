@@ -58,10 +58,13 @@ Myeval <- function(x, y){
 }
 
 
-pred_INLA_full <- bind_rows(readRDS("output/Xval1000.rds") , 
+pred_INLA_full <- bind_rows(readRDS("output/Xval600.rds") ,
+                            
+                            readRDS("output/Xval1000.rds") , 
                             readRDS("output/Xval2000.rds") ,
                             readRDS("output/Xval4000.rds") ,
-                            readRDS("output/Xval7500.rds"), .id = "column_label"
+                            readRDS("output/Xval7500.rds"), 
+                            .id = "column_label"
                 
                          ) 
 
@@ -95,10 +98,20 @@ results_summaryV <- tt %>%
             .groups = "drop" 
   ) 
 
+results_summaryN <- tt %>%
+
+  group_by(sample_size, method, approach, type_val) %>%
+  dplyr::summarise(n = n(),
+                   .groups = "drop" 
+  ) %>%
+  distinct(n)
+
 
 # Visualisation des résultats
 library(tidyr)
 library(stringr)
+
+
 
 results_summaryV %>%
   pivot_longer(ME_1:Cb_2, names_to = "Indice", values_to = "valeur") |>
