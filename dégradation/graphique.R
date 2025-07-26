@@ -58,7 +58,7 @@ Myeval <- function(x, y){
 }
 
 
-pred_INLA_full <- bind_rows(readRDS("output/Xval600.rds") ,
+pred_INLA_full <- bind_rows(readRDS("output/Xval_arg600.rds") ,
                             
                             readRDS("output/Xval1000.rds") , 
                             readRDS("output/Xval2000.rds") ,
@@ -130,8 +130,8 @@ results_summaryV %>%
     )
   ) +
   
-  geom_ribbon(aes(ymin = mean + 1.96 * sd / 2.23,
-                  ymax = mean - 1.96 * sd / 2.23, 
+  geom_ribbon(aes(ymin = mean + 1.96 * sd / sqrt(results_summaryN$n),
+                  ymax = mean - 1.96 * sd / sqrt(results_summaryN$n), 
                   fill = method,
                   linetype=type_val), alpha = 0.3)+
   

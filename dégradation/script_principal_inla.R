@@ -35,7 +35,7 @@ library(caret)
 source("dégradation/fonction_RF.R")
 
 source("dégradation/fonction_inla.R")
-
+source("dégradation/fonction_geomasking.R")
 #Myeval
 Myeval <- function(x, y){
   ME <- mean(y - x, na.rm = TRUE)
@@ -72,8 +72,7 @@ sample_sizes <- args[2] # c(500,1000 ) # c(600,800,1000,1200,1300,1400,1600,1800
 repets <- args[3]
 types_validation <- c("Classique", "Spatiale")
 drive = "/media/communs_infosol/" # ou "Y:/"
-
-calculRF = TRUE
+geomasking = 100
 
 #3. Chargement des données---- 
 
@@ -85,13 +84,10 @@ moyenne_covariable <- readRDS(paste0(drive, "BDAT/traitement_donnees/MameGadiaga
 
 cov_brt <- readRDS(paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/", name, "_cov_brt.rds"))
 
-#4. RF pour la validation croisée avec dégradation----
+#4. loop of the ----
 
-#initialisation
-results_rf_all <- list()
-results_rf_all_metrics <- list()
 
-cat("\n==============  RANDOM FOREST ===============\n")
+cat("\n==============  Starting loops ===============\n")
 
 bru_safe_inla(multicore = FALSE)
 
@@ -152,6 +148,9 @@ pred_RF_full <-  foreach(
           
           if (nrow(calib_pool) > n) calib_points <- calib_pool %>% sample_n(n) else calib_points <- calib_pool
           
+          if ( !is.na(geomasking) ) {
+            calib_points_geomasked <- geomasking(calib_points,geomasking)
+          }
           
           
           # RF Ponctuelle
@@ -168,7 +167,6 @@ pred_RF_full <-  foreach(
             NomsCoord
           )
           
-          
           calib_points$pred  <- res_rf_p$predCal
           
           
@@ -180,7 +178,9 @@ pred_RF_full <-  foreach(
                       .groups = "drop")
           
           train_aggr <- moyenne_covariable %>%
-            inner_join(agg_target, by = "INSEE_COM")
+            inner_join(agg_target, 
+                       by = "INSEE_COM"
+                       )
           
           res_rf_c <- run_rf(
             "Centroide",
