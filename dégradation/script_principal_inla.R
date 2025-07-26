@@ -98,7 +98,8 @@ bru_safe_inla(multicore = FALSE)
 pred_RF_full <-  foreach(
   
   n = sample_sizes,
-  .combine = rbind.data.frame
+  .combine = rbind.data.frame ,
+  .errorhandling='pass'
   
   ) %do% {
     cat("\n============== Taille d'échantillon :", n, "===============\n")
@@ -106,7 +107,10 @@ pred_RF_full <-  foreach(
     k <- ceiling(nrow(datacov) / 1000)
     foreach (
       
-      rep = 1:repets
+      rep = 1:repets,
+      .combine = rbind.data.frame,
+      
+      .errorhandling='pass'
       
              ) %do%  {
       cat("\n---- Répétition :", rep, "----\n")
@@ -114,7 +118,8 @@ pred_RF_full <-  foreach(
       set.seed(1001 + rep)
       
       foreach (type_val = types_validation,
-               .combine = rbind.data.frame
+               .combine = rbind.data.frame,
+               .errorhandling='pass'
                ) %do% {
         cat(">> Validation :", type_val, "\n")
         
@@ -126,7 +131,8 @@ pred_RF_full <-  foreach(
         }
         
         foreach (fold_idx = 1:k,
-                 .combine = rbind.data.frame
+                 .combine = rbind.data.frame,
+                 .errorhandling='pass'
                  ) %do%  {
           
           cat("   > Fold", fold_idx, "sur", k, "\n")
