@@ -57,16 +57,19 @@ Myeval <- function(x, y){
   data.frame(ME = ME, MAE = MAE, RMSE = RMSE, r = r, r2 = r2, NSE = NSE, CCC = CCC, Cb = Cb)
 }
 
+pattern <- "Xval_pH*"
+pattern <- "Xval_arg*"
 
-pred_INLA_full <- bind_rows(readRDS("output/Xval_arg600.rds") ,
-                            
-                            readRDS("output/Xval1000.rds") , 
-                            readRDS("output/Xval2000.rds") ,
-                            readRDS("output/Xval4000.rds") ,
-                            readRDS("output/Xval7500.rds"), 
-                            .id = "column_label"
-                
-                         ) 
+lf <- list.files(path = "output/", 
+                 pattern = pattern,
+                full.names = T
+                 )
+
+
+
+pred_INLA_full <- bind_rows(
+  lapply(lf, readRDS)
+  ) 
 
 
 tt <- pred_INLA_full %>%

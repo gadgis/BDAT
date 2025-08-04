@@ -72,7 +72,7 @@ sample_sizes <- args[2] # c(500,1000 ) # c(600,800,1000,1200,1300,1400,1600,1800
 repets <- args[3]
 types_validation <- c("Classique", "Spatiale")
 drive = "/media/communs_infosol/" # ou "Y:/"
-geomasking = 100
+DistanceGeomasking = 0
 
 #3. Chargement des données---- 
 
@@ -148,7 +148,7 @@ pred_RF_full <-  foreach(
           
           if (nrow(calib_pool) > n) calib_points <- calib_pool %>% sample_n(n) else calib_points <- calib_pool
           
-          if ( !is.na(geomasking) ) {
+          if ( DistanceGeomasking >0 ) {
             calib_points_geomasked <- geomasking(calib_points,geomasking)
           }
           
