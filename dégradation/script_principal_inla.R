@@ -64,14 +64,14 @@ Myeval <- function(x, y){
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
 
-name <- args[1]  #arg
+name <- "pH"  #arg
 kmax <- 30
 ntree <- 350
 NomsCoord <- c("x", "y")
-sample_sizes <- args[2] # c(500,1000 ) # c(600,800,1000,1200,1300,1400,1600,1800,2000,3000,4000,5000,6000,7000,7600)
-repets <- args[3]
+sample_sizes <-    c(600,800,1000,1500,2000,3000,4000,5000,6000,7000,8000,9000,10000)
+repets <- 10
 types_validation <- c("Classique", "Spatiale")
-drive = "/media/communs_infosol/" # ou "Y:/"
+drive =  'Y:/'# ou #"/media/communs_infosol/" 
 geomasking = 100
 
 #3. Chargement des données---- 
@@ -91,7 +91,9 @@ cat("\n==============  Starting loops ===============\n")
 
 bru_safe_inla(multicore = FALSE)
 
-pred_RF_full <-  foreach(
+results_rf_all <- list()
+
+foreach(
   
   n = sample_sizes,
   .combine = rbind.data.frame ,
@@ -148,9 +150,9 @@ pred_RF_full <-  foreach(
           
           if (nrow(calib_pool) > n) calib_points <- calib_pool %>% sample_n(n) else calib_points <- calib_pool
           
-          if ( !is.na(geomasking) ) {
-            calib_points_geomasked <- geomasking(calib_points,geomasking)
-          }
+          # if ( !is.na(geomasking) ) {
+          #   calib_points_geomasked <- geomasking(calib_points,geomasking)
+          #}
           
           
           # RF Ponctuelle
@@ -246,9 +248,7 @@ pred_RF_full <-  foreach(
           
           
           # Stockage des prédictions RF
-          # results_rf_all[[length(results_rf_all) + 1]] <-
-            
-            bind_rows(
+      results_rf_all[[length(results_rf_all) + 1]] <- bind_rows(
             res_rf_p$detail %>% 
               mutate(approach = "Ponctuelle", 
                      type_val = type_val,
@@ -290,11 +290,12 @@ cat("FIN DES CALCULS--------------------")
 
   
   # Fusion de toutes les prédictions RF
+pred_RF_full <- bind_rows(results_rf_all)
+
 saveRDS(pred_RF_full, 
-        paste0(
-          "output/Xval_",
-          name,
-          paste0(sample_sizes,collapse = "_") ,
-          ".rds")
-        )
+        paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/",
+               paste0("Xval_",
+                      name,
+                      paste0(sample_sizes,collapse = "_") ,
+                      ".rds")))
   
