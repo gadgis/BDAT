@@ -114,7 +114,7 @@ results_summaryN <- tt %>%
 library(tidyr)
 library(stringr)
 
-
+N <- results_summaryN$n[1]
 
 results_summaryV %>%
   pivot_longer(ME_1:Cb_2, names_to = "Indice", values_to = "valeur") |>
@@ -133,8 +133,8 @@ results_summaryV %>%
     )
   ) +
   
-  geom_ribbon(aes(ymin = mean + 1.96 * sd / sqrt(results_summaryN$n),
-                  ymax = mean - 1.96 * sd / sqrt(results_summaryN$n), 
+  geom_ribbon(aes(ymin = mean + 1.96 * sd / sqrt(N),
+                  ymax = mean - 1.96 * sd / sqrt(N), 
                   fill = method,
                   linetype=type_val), alpha = 0.3)+
   

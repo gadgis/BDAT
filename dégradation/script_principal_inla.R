@@ -65,11 +65,14 @@ Myeval <- function(x, y){
 args = commandArgs(trailingOnly=TRUE)
 
 name <- args[1]  #arg
+sample_sizes <- args[2] # c(500,1000 ) # c(600,800,1000,1200,1300,1400,1600,1800,2000,3000,4000,5000,6000,7000,7600)
+repets <- args[3]
+
+
+
 kmax <- 30
 ntree <- 350
 NomsCoord <- c("x", "y")
-sample_sizes <- args[2] # c(500,1000 ) # c(600,800,1000,1200,1300,1400,1600,1800,2000,3000,4000,5000,6000,7000,7600)
-repets <- args[3]
 types_validation <- c("Classique", "Spatiale")
 drive = "/media/communs_infosol/" # ou "Y:/"
 DistanceGeomasking = 0
@@ -100,7 +103,7 @@ pred_RF_full <-  foreach(
   ) %do% {
     cat("\n============== Taille d'échantillon :", n, "===============\n")
     
-    k <- ceiling(nrow(datacov) / 1000)
+    k <- 15 # ceiling(nrow(datacov) / 1000)
     foreach (
       
       rep = 1:repets,
@@ -126,7 +129,7 @@ pred_RF_full <-  foreach(
           split(communes, sample(rep(1:k, length.out = length(communes))))
         }
         
-        foreach (fold_idx = 1:k,
+      foreach (fold_idx = 1:k,
                  .combine = rbind.data.frame,
                  .errorhandling='pass'
                  ) %do%  {
@@ -146,7 +149,16 @@ pred_RF_full <-  foreach(
             calib_pool <- datacov[idx_calib, ]
           }
           
-          if (nrow(calib_pool) > n) calib_points <- calib_pool %>% sample_n(n) else calib_points <- calib_pool
+          if (nrow(calib_pool) > n) {
+            
+            calib_points <- calib_pool %>% sample_n(n)  
+            cat("-----resample >>>>>")
+          }  else {
+            calib_points <- calib_pool
+            
+          }
+            
+          
           
           if ( DistanceGeomasking >0 ) {
             calib_points_geomasked <- geomasking(calib_points,geomasking)
