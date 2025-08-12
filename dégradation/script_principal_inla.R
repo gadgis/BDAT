@@ -94,7 +94,9 @@ cat("\n==============  Starting loops ===============\n")
 
 bru_safe_inla(multicore = FALSE)
 
-pred_RF_full <-  foreach(
+results_rf_all <- list()
+
+foreach(
   
   n = sample_sizes,
   .combine = rbind.data.frame ,
@@ -159,11 +161,10 @@ pred_RF_full <-  foreach(
           }
             
           
-          
-          if ( DistanceGeomasking >0 ) {
-            calib_points_geomasked <- geomasking(calib_points,geomasking)
-          }
-          
+          # if ( !is.na(geomasking) ) {
+          #   calib_points_geomasked <- geomasking(calib_points,geomasking)
+          #}
+
           
           # RF Ponctuelle
           res_rf_p <- run_rf(
@@ -258,9 +259,7 @@ pred_RF_full <-  foreach(
           
           
           # Stockage des prédictions RF
-          # results_rf_all[[length(results_rf_all) + 1]] <-
-            
-            bind_rows(
+      results_rf_all[[length(results_rf_all) + 1]] <- bind_rows(
             res_rf_p$detail %>% 
               mutate(approach = "Ponctuelle", 
                      type_val = type_val,
@@ -302,11 +301,12 @@ cat("FIN DES CALCULS--------------------")
 
   
   # Fusion de toutes les prédictions RF
+pred_RF_full <- bind_rows(results_rf_all)
+
 saveRDS(pred_RF_full, 
-        paste0(
-          "output/Xval_",
-          name,
-          paste0(sample_sizes,collapse = "_") ,
-          ".rds")
-        )
+        paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/",
+               paste0("Xval_",
+                      name,
+                      paste0(sample_sizes,collapse = "_") ,
+                      ".rds")))
   

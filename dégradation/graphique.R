@@ -68,7 +68,7 @@ lf <- list.files(path = "output/",
 
 
 pred_INLA_full <- bind_rows(
-  lapply(lf, readRDS)
+  lapply(lf[-1], readRDS)
   ) 
 
 
