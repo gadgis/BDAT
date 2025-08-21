@@ -10,7 +10,7 @@ repets = 1
 k = 30
 rep = 1
 fold_idx= 1
-sample_sizes = 4000
+sample_sizes = c(600,1000)
 kmax <- 30
 ntree <- 350
 NomsCoord <- c("x", "y")

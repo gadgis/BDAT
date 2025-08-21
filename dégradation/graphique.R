@@ -57,7 +57,7 @@ Myeval <- function(x, y){
   data.frame(ME = ME, MAE = MAE, RMSE = RMSE, r = r, r2 = r2, NSE = NSE, CCC = CCC, Cb = Cb)
 }
 
-pattern <- "Xval_pH*"
+pattern <- "Xval2_pH*"
 pattern <- "Xval2_arg*"
 
 lf <- list.files(path = "output/", 
@@ -68,7 +68,11 @@ lf <- list.files(path = "output/",
 
 
 pred_INLA_full <- bind_rows(
-  lapply(lf[], readRDS)
+  lapply(lf[], function(x) {
+    dt <- readRDS(x)
+    dt$sample_size = as.numeric(dt$sample_size)
+    dt
+  } ) 
   ) 
 
 

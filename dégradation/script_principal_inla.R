@@ -103,6 +103,9 @@ resLoop <- foreach(
   .errorhandling='pass'
   
   ) %do% {
+    
+    n <- as.numeric(n)# test pour voir si cela corrige le pb de test degradation
+    
     cat("\n============== Taille d'échantillon :", n, "===============\n")
     
     k <- 10 #  ceiling(nrow(datacov) / 1000)
@@ -154,9 +157,9 @@ resLoop <- foreach(
                    
           NCalibTotal <- nrow(calib_pool)
           
-          cat("-----taille du groupe de la kfold  ", NCalibTotal ,"\net n = ", n ,"et le test est ",  NCalibTotal>=n ," >>>>>\n")
+          cat("-----taille du groupe de la kfold  ", NCalibTotal ,"\net n = ", n ,"et le test est ",  NCalibTotal>=n ," \n>>>>>")
                    
-          if ( NCalibTotal>=n) {
+          if ( NCalibTotal>=n ) {
             
             calib_points <- calib_pool %>% sample_n(n)  
             
