@@ -96,7 +96,7 @@ bru_safe_inla(multicore = FALSE)
 
 results_rf_all <- list()
 
-foreach(
+resLoop <- foreach(
   
   n = sample_sizes,
   .combine = rbind.data.frame ,
@@ -105,7 +105,7 @@ foreach(
   ) %do% {
     cat("\n============== Taille d'échantillon :", n, "===============\n")
     
-    k <- 15 # ceiling(nrow(datacov) / 1000)
+    k <- 10 #  ceiling(nrow(datacov) / 1000)
     foreach (
       
       rep = 1:repets,
@@ -151,15 +151,26 @@ foreach(
             calib_pool <- datacov[idx_calib, ]
           }
           
-          if (nrow(calib_pool) > n) {
+                   
+          NCalibTotal <- nrow(calib_pool)
+          
+          cat("-----taille du groupe de la kfold  ", NCalibTotal ,"\net n = ", n ,"et le test est ",  NCalibTotal>=n ," >>>>>\n")
+                   
+          if ( NCalibTotal>=n) {
             
             calib_points <- calib_pool %>% sample_n(n)  
-            cat("-----resample >>>>>")
+            
+            cat("----- resample  ",n," >>>>>")
+            
           }  else {
+            
+            cat("-----Pas de resample  !!!",n," >>>>>\n")
+            
             calib_points <- calib_pool
             
           }
             
+          cat("-----taille du groupe resample de la kfold  ",nrow(calib_points)," >>>>>")
           
           # if ( !is.na(geomasking) ) {
           #   calib_points_geomasked <- geomasking(calib_points,geomasking)
@@ -184,6 +195,7 @@ foreach(
           
           
           # agrgégation de la variable cible pour la méthode Centroide
+          
           agg_target <- calib_points %>%
             dplyr::select(INSEE_COM, all_of(name)) %>%
             group_by(INSEE_COM) %>%
@@ -301,12 +313,46 @@ cat("FIN DES CALCULS--------------------")
 
   
   # Fusion de toutes les prédictions RF
+
 pred_RF_full <- bind_rows(results_rf_all)
 
-saveRDS(pred_RF_full, 
-        paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/",
-               paste0("Xval_",
-                      name,
-                      paste0(sample_sizes,collapse = "_") ,
-                      ".rds")))
+# 5. Save file -------------------- 
+
+if(drive == "Y:/") {
+  Myfile = paste0(drive, 
+                  "BDAT/traitement_donnees/MameGadiaga/resultats/",
+                  paste0("Xval_",
+                         name,
+                         sample_sizes,
+                                collapse = "_") ,
+                         ".rds")
+  } else {
+    
+    Myfile = paste0( 
+                    "output/",
+                    paste0("Xval_",
+                           name,
+                           sample_sizes,
+                           collapse = "_") ,
+                    ".rds")
+    
+    Myfile2 = paste0( 
+      "output/",
+      paste0("Xval2_",
+             name,
+             sample_sizes,
+             collapse = "_") ,
+      ".rds")
+    
+  }
   
+
+
+                       
+
+saveRDS(pred_RF_full, 
+        Myfile)
+  
+saveRDS(resLoop, 
+        Myfile2)
+

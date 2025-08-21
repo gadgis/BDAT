@@ -58,7 +58,7 @@ Myeval <- function(x, y){
 }
 
 pattern <- "Xval_pH*"
-pattern <- "Xval_arg*"
+pattern <- "Xval2_arg*"
 
 lf <- list.files(path = "output/", 
                  pattern = pattern,
@@ -68,7 +68,7 @@ lf <- list.files(path = "output/",
 
 
 pred_INLA_full <- bind_rows(
-  lapply(lf[-1], readRDS)
+  lapply(lf[], readRDS)
   ) 
 
 
