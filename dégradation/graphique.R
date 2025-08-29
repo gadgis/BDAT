@@ -58,6 +58,8 @@ Myeval <- function(x, y){
 }
 
 pattern <- "Xval2_pH*"
+
+
 pattern <- "Xval2_arg*"
 
 lf <- list.files(path = "output/", 
@@ -120,7 +122,18 @@ library(stringr)
 
 N <- results_summaryN$n[1]
 
+
+# New facet label names for supp variable
+supp.labs <- c("Désagrégation", "Ponctuelle")
+names(supp.labs) <- c("Centroide", "Ponctuelle")
+
+ind.labs <- c("ESMQ","NSE","Cb")
+names(ind.labs) <- c("RMSE","NSE","Cb")
+
+
 results_summaryV %>%
+
+   filter(sample_size>400) %>%
   pivot_longer(ME_1:Cb_2, names_to = "Indice", values_to = "valeur") |>
   mutate(type = if_else(  grepl( "[1]", Indice ) ,"mean" , "sd" ) ,
          indice2 = str_split(Indice,"_",simplify = T)[,1]
@@ -159,7 +172,11 @@ results_summaryV %>%
   ) +
   
   
-  facet_grid(indice2~approach, scales= "free") +
+  facet_grid(indice2~approach, 
+             scales= "free" ,
+             labeller = labeller(approach = supp.labs,
+                                 indice2 = ind.labs)
+             ) +
   labs(
     x = "Taille de l'échantillon (calibration)",
     y = "Indice",

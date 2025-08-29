@@ -34,17 +34,21 @@ nohup Rscript dégradation/script_principal_inla.R  arg 400 5 > test400.out&
 nohup Rscript dégradation/script_principal_inla.R  arg 600 5 > test600.out&
 nohup Rscript dégradation/script_principal_inla.R  arg 1000 5 > test2.out&
 nohup Rscript dégradation/script_principal_inla.R  arg 2000 5 > test3.out&
+nohup Rscript dégradation/script_principal_inla.R  arg 3000 5 > test32.out&
 nohup Rscript dégradation/script_principal_inla.R  arg 4000 5 > test4.out&
 nohup Rscript dégradation/script_principal_inla.R  arg 5000 5 > test5000.out&
 nohup Rscript dégradation/script_principal_inla.R  arg 7500 5 > test6.out&
   
   
-nohup Rscript dégradation/script_principal_inla.R  pH 400 5 > test50a.out&
-nohup Rscript dégradation/script_principal_inla.R  pH 600 5 > test500a.out&
+  nohup Rscript dégradation/script_principal_inla.R  pH 200 5 > test2a.out&
+  nohup Rscript dégradation/script_principal_inla.R  pH 400 5 > test50a.out&
+  nohup Rscript dégradation/script_principal_inla.R  pH 600 5 > test500a.out&
 nohup Rscript dégradation/script_principal_inla.R  pH 1000 5 > test2a.out&
+  nohup Rscript dégradation/script_principal_inla.R  pH 1500 5 > test31a.out&
   nohup Rscript dégradation/script_principal_inla.R  pH 2000 5 > test3a.out&
   nohup Rscript dégradation/script_principal_inla.R  pH 3000 5 > test3b.out&
   nohup Rscript dégradation/script_principal_inla.R  pH 4000 5 > test4a.out&
+  nohup Rscript dégradation/script_principal_inla.R  pH 6000 5 > test6000a.out&
   nohup Rscript dégradation/script_principal_inla.R  pH 7500 5 > test6a.out&
   nohup Rscript dégradation/script_principal_inla.R  pH 10000 5 > test6a.out&
   
