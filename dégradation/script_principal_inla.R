@@ -64,15 +64,18 @@ Myeval <- function(x, y){
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
 
-name <- "pH"  #arg
+name <- args[1]  #arg
+sample_sizes <- args[2] # c(500,1000 ) # c(600,800,1000,1200,1300,1400,1600,1800,2000,3000,4000,5000,6000,7000,7600)
+repets <- args[3]
+
+
+
 kmax <- 30
 ntree <- 350
 NomsCoord <- c("x", "y")
-sample_sizes <-    c(600,800,1000,1500,2000,3000,4000,5000,6000,7000,8000,9000,10000)
-repets <- 10
 types_validation <- c("Classique", "Spatiale")
-drive =  'Y:/'# ou #"/media/communs_infosol/" 
-geomasking = 100
+drive = "/media/communs_infosol/" # ou "Y:/"
+DistanceGeomasking = 0
 
 #3. Chargement des données---- 
 
@@ -93,16 +96,19 @@ bru_safe_inla(multicore = FALSE)
 
 results_rf_all <- list()
 
-foreach(
+resLoop <- foreach(
   
   n = sample_sizes,
   .combine = rbind.data.frame ,
   .errorhandling='pass'
   
   ) %do% {
+    
+    n <- as.numeric(n)# test pour voir si cela corrige le pb de test degradation
+    
     cat("\n============== Taille d'échantillon :", n, "===============\n")
     
-    k <- ceiling(nrow(datacov) / 1000)
+    k <- 10 #  ceiling(nrow(datacov) / 1000)
     foreach (
       
       rep = 1:repets,
@@ -128,7 +134,7 @@ foreach(
           split(communes, sample(rep(1:k, length.out = length(communes))))
         }
         
-        foreach (fold_idx = 1:k,
+      foreach (fold_idx = 1:k,
                  .combine = rbind.data.frame,
                  .errorhandling='pass'
                  ) %do%  {
@@ -148,12 +154,31 @@ foreach(
             calib_pool <- datacov[idx_calib, ]
           }
           
-          if (nrow(calib_pool) > n) calib_points <- calib_pool %>% sample_n(n) else calib_points <- calib_pool
+                   
+          NCalibTotal <- nrow(calib_pool)
+          
+          cat("-----taille du groupe de la kfold  ", NCalibTotal ,"\net n = ", n ,"et le test est ",  NCalibTotal>=n ," \n>>>>>")
+                   
+          if ( NCalibTotal>=n ) {
+            
+            calib_points <- calib_pool %>% sample_n(n)  
+            
+            cat("----- resample  ",n," >>>>>")
+            
+          }  else {
+            
+            cat("-----Pas de resample  !!!",n," >>>>>\n")
+            
+            calib_points <- calib_pool
+            
+          }
+            
+          cat("-----taille du groupe resample de la kfold  ",nrow(calib_points)," >>>>>")
           
           # if ( !is.na(geomasking) ) {
           #   calib_points_geomasked <- geomasking(calib_points,geomasking)
           #}
-          
+
           
           # RF Ponctuelle
           res_rf_p <- run_rf(
@@ -173,6 +198,7 @@ foreach(
           
           
           # agrgégation de la variable cible pour la méthode Centroide
+          
           agg_target <- calib_points %>%
             dplyr::select(INSEE_COM, all_of(name)) %>%
             group_by(INSEE_COM) %>%
@@ -290,12 +316,46 @@ cat("FIN DES CALCULS--------------------")
 
   
   # Fusion de toutes les prédictions RF
+
 pred_RF_full <- bind_rows(results_rf_all)
 
-saveRDS(pred_RF_full, 
-        paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/",
-               paste0("Xval_",
-                      name,
-                      paste0(sample_sizes,collapse = "_") ,
-                      ".rds")))
+# 5. Save file -------------------- 
+
+if(drive == "Y:/") {
+  Myfile = paste0(drive, 
+                  "BDAT/traitement_donnees/MameGadiaga/resultats/",
+                  paste0("Xval_",
+                         name,
+                         sample_sizes,
+                                collapse = "_") ,
+                         ".rds")
+  } else {
+    
+    Myfile = paste0( 
+                    "output/",
+                    paste0("Xval_",
+                           name,
+                           sample_sizes,
+                           collapse = "_") ,
+                    ".rds")
+    
+    Myfile2 = paste0( 
+      "output/",
+      paste0("Xval2_",
+             name,
+             sample_sizes,
+             collapse = "_") ,
+      ".rds")
+    
+  }
   
+
+
+                       
+
+saveRDS(pred_RF_full, 
+        Myfile)
+  
+saveRDS(resLoop, 
+        Myfile2)
+
