@@ -22,29 +22,25 @@ Myeval <- function(x, y){
   data.frame(ME = ME, MAE = MAE, RMSE = RMSE, r = r, r2 = r2, NSE = NSE, CCC = CCC, Cb = Cb)
 }
 
-pattern <- "Xval2_pH*"
+#pattern <- "Xval2_pH*"
+# pattern <- "Xval2_arg*"
+# 
+# lf <- list.files(path = "output/", 
+#                  pattern = pattern,
+#                 full.names = T
+#                  )
+# 
+# 
+# 
+# pred_INLA_full <- bind_rows(
+#   lapply(lf[], function(x) {
+#     dt <- readRDS(x)
+#     dt$sample_size = as.numeric(dt$sample_size)
+#     dt
+#   } ) 
+#   ) 
 
-<<<<<<< HEAD
 pred_INLA_full <-readRDS("Xval_pH600_800_1000_1500_2000_3000_4000_5000_6000_7000_8000_9000_10000.rds") 
-=======
-
-pattern <- "Xval2_arg*"
-
-lf <- list.files(path = "output/", 
-                 pattern = pattern,
-                full.names = T
-                 )
-
-
-
-pred_INLA_full <- bind_rows(
-  lapply(lf[], function(x) {
-    dt <- readRDS(x)
-    dt$sample_size = as.numeric(dt$sample_size)
-    dt
-  } ) 
-  ) 
->>>>>>> 8155ba9ffc91e1cd85f735b9f07c340b60b97d22
 
 pred_INLA_full<- pred_INLA_full %>%
   rename(RF=pred,
@@ -91,37 +87,25 @@ results_summaryN <- tt %>%
   distinct(n)
 
 
-<<<<<<< HEAD
-supp.labs <- c("Désagrégation","Données Ponctuelles")
-names(supp.labs) <- c("Centroide","Ponctuelles")
 
-results_summaryV %>%
-  pivot_longer(ME_1:CCC_2, names_to = "Indice", values_to = "valeur") |>
-=======
-# Visualisation des résultats
-library(tidyr)
-library(stringr)
 
-N <- results_summaryN$n[1]
+
+
+#N <- results_summaryN$n[1]
 
 
 # New facet label names for supp variable
-supp.labs <- c("Désagrégation", "Ponctuelle")
+supp.labs <- c("Désagrégation", "Données Ponctuelles")
 names(supp.labs) <- c("Centroide", "Ponctuelle")
 
-ind.labs <- c("ESMQ","NSE","Cb")
-names(ind.labs) <- c("RMSE","NSE","Cb")
-
+ind.labs <- c("ESMQ","NSE","Ccc")
+names(ind.labs) <- c("RMSE","NSE","CCC")
 
 results_summaryV %>%
+  pivot_longer(ME_1:CCC_2, names_to = "Indice", values_to = "valeur") |>
 
-   filter(sample_size>400) %>%
-  pivot_longer(ME_1:Cb_2, names_to = "Indice", values_to = "valeur") |>
->>>>>>> 8155ba9ffc91e1cd85f735b9f07c340b60b97d22
   mutate(type = if_else(  grepl( "[1]", Indice ) ,"mean" , "sd" ) ,
-         indice2 = str_split(Indice,"_",simplify = T)[,1]
-         
-  ) %>%
+         indice2 = str_split(Indice,"_",simplify = T)[,1]) %>%
   
   pivot_wider(id_cols = !Indice,names_from = type, values_from = valeur) %>%
   filter(indice2 %in% c("RMSE","NSE","CCC")) %>%
@@ -133,18 +117,11 @@ results_summaryV %>%
     )
   ) +
   
-<<<<<<< HEAD
   geom_ribbon(aes(ymin = mean + 1.96 * sd / sqrt(results_summaryN$n),
                   ymax = mean - 1.96 * sd / sqrt(results_summaryN$n), 
                   fill = Méthode,
                   linetype=Validation), alpha = 0.3)+
-=======
-  geom_ribbon(aes(ymin = mean + 1.96 * sd / sqrt(N),
-                  ymax = mean - 1.96 * sd / sqrt(N), 
-                  fill = method,
-                  linetype=type_val), alpha = 0.3)+
->>>>>>> 8155ba9ffc91e1cd85f735b9f07c340b60b97d22
-  
+
   geom_line( aes(
     color = Méthode,
     linetype=Validation
@@ -162,16 +139,12 @@ results_summaryV %>%
   ) +
   
   
-<<<<<<< HEAD
+
   facet_grid(indice2~Approche, scales= "free",
-             labeller=labeller(Approche=supp.labs)) +
-=======
-  facet_grid(indice2~approach, 
-             scales= "free" ,
-             labeller = labeller(approach = supp.labs,
-                                 indice2 = ind.labs)
-             ) +
->>>>>>> 8155ba9ffc91e1cd85f735b9f07c340b60b97d22
+             labeller=labeller(Approche=supp.labs,
+                               #indice2=ind.lab)
+             )) +
+
   labs(
     x = "Taille de l'échantillon (calibration)",
     y = "Indice",
