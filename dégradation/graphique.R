@@ -1,42 +1,7 @@
 library(dplyr)
 library(ggplot2)
 library(tidyr)
-# metrics_INLA_full <- readRDS("~/bdat/stage_bdat/output/metrics_INLA_full.rds")
-# metrics_RF_full <- readRDS("~/bdat/stage_bdat/output/metrics_RF_full.rds")
-# 
-# 
-# tt <- bind_rows(pred_INLA_full , pred_RF_full ) %>%
-#   mutate( diffR = pred - obs ) %>%
-#   group_by(sample_size, method, approach, type_val) %>%
-#   reframe(res = mean(diffR))
-# 
-# 
-# 
-# results_summary <- bind_rows(metrics_INLA_full , metrics_RF_full) %>%
-#   mutate(NSE = if_else(NSE<0,0,NSE)) %>%
-#   group_by(sample_size, method, approach, type_val) %>%
-#   summarise(across(c(ME, MAE, RMSE, r, r2, NSE, Cb), 
-#                    mean, na.rm = TRUE),
-#             .groups = "drop"
-#   ) %>%
-#   mutate(across(c(ME, MAE, RMSE, r, r2, NSE, Cb), round, digits = 4))
-# 
-# results_summaryV <- 
-#   bind_rows(
-#     metrics_INLA_full , metrics_RF_full
-#     ) %>%
-#   mutate(NSE = if_else(NSE<0,0,NSE)) %>%
-#   
-#   group_by(sample_size, method) %>%
-#   summarise(across(c(ME, MAE, RMSE, r, r2, NSE, Cb),
-#                    list(mean,sd), na.rm = TRUE),
-#             .groups = "drop" 
-#   ) 
-# 
-# 
-# 
-# pred_INLA_full <- readRDS("~/bdat/stage_bdat/output/pred_INLA_full.rds")
-# pred_RF_full <- readRDS("~/bdat/stage_bdat/output/pred_RF_full.rds")
+library(stringr)
 
 Myeval <- function(x, y){
   ME <- mean(y - x, na.rm = TRUE)
@@ -58,70 +23,65 @@ Myeval <- function(x, y){
 }
 
 
-pred_INLA_full <- bind_rows(readRDS("output/Xval_arg600.rds") ,
-                            
-                            readRDS("output/Xval1000.rds") , 
-                            readRDS("output/Xval2000.rds") ,
-                            readRDS("output/Xval4000.rds") ,
-                            readRDS("output/Xval7500.rds"), 
-                            .id = "column_label"
-                
-                         ) 
+pred_INLA_full <-readRDS("Xval_pH600_800_1000_1500_2000_3000_4000_5000_6000_7000_8000_9000_10000.rds") 
 
+pred_INLA_full<- pred_INLA_full %>%
+  rename(RF=pred,
+         KED=predKED,
+         KO=predKO)
 
 tt <- pred_INLA_full %>%
-  pivot_longer(cols =pred:predKED ,
-               names_to = "method",
+  pivot_longer(cols =RF:KED ,
+               names_to = "Méthode",
                values_to = "pred",
   ) %>%
-group_by(sample_size, method, approach, type_val,rep) %>%
+  group_by(sample_size, Méthode, approach, type_val,rep) %>%
   
   group_modify(~Myeval(.$pred,.$obs)) %>%
-  ungroup()
-
+  ungroup() %>%
+  rename(Approche = approach,
+         Validation = type_val
+  )
 
 results_summary <- tt %>%
   mutate(NSE = if_else(NSE<0,0,NSE)) %>%
-  group_by(sample_size, method, approach, type_val) %>%
-  summarise(across(c(ME, MAE, RMSE, r, r2, NSE, Cb), 
+  group_by(sample_size, Méthode, Approche, Validation) %>%
+  summarise(across(c(ME, MAE, RMSE, r, r2, NSE, CCC), 
                    mean, na.rm = TRUE),
             .groups = "drop"
   ) %>%
-  mutate(across(c(ME, MAE, RMSE, r, r2, NSE, Cb), round, digits = 4))
+  mutate(across(c(ME, MAE, RMSE, r, r2, NSE, CCC), round, digits = 4))
 
 results_summaryV <- tt %>%
   mutate(NSE = if_else(NSE<0,0,NSE)) %>%
   
-  group_by(sample_size, method, approach, type_val) %>%
-  dplyr::summarise(across(c(ME, MAE, RMSE, r, r2, NSE, Cb),
-                   list(mean,sd), na.rm = TRUE),
-            .groups = "drop" 
+  group_by(sample_size, Méthode, Approche, Validation) %>%
+  dplyr::summarise(across(c(ME, MAE, RMSE, r, r2, NSE, CCC),
+                          list(mean,sd), na.rm = TRUE),
+                   .groups = "drop" 
   ) 
 
 results_summaryN <- tt %>%
-
-  group_by(sample_size, method, approach, type_val) %>%
+  
+  group_by(sample_size, Méthode, Approche, Validation) %>%
   dplyr::summarise(n = n(),
                    .groups = "drop" 
   ) %>%
   distinct(n)
 
 
-# Visualisation des résultats
-library(tidyr)
-library(stringr)
-
-
+supp.labs <- c("Désagrégation","Données Ponctuelles")
+names(supp.labs) <- c("Centroide","Ponctuelles")
 
 results_summaryV %>%
-  pivot_longer(ME_1:Cb_2, names_to = "Indice", values_to = "valeur") |>
+  pivot_longer(ME_1:CCC_2, names_to = "Indice", values_to = "valeur") |>
   mutate(type = if_else(  grepl( "[1]", Indice ) ,"mean" , "sd" ) ,
          indice2 = str_split(Indice,"_",simplify = T)[,1]
          
   ) %>%
   
   pivot_wider(id_cols = !Indice,names_from = type, values_from = valeur) %>%
-  filter(indice2 %in% c("RMSE","NSE","Cb")) %>%
+  filter(indice2 %in% c("RMSE","NSE","CCC")) %>%
   mutate(sample_size = as.numeric(sample_size)) %>%
   
   ggplot(
@@ -132,16 +92,16 @@ results_summaryV %>%
   
   geom_ribbon(aes(ymin = mean + 1.96 * sd / sqrt(results_summaryN$n),
                   ymax = mean - 1.96 * sd / sqrt(results_summaryN$n), 
-                  fill = method,
-                  linetype=type_val), alpha = 0.3)+
+                  fill = Méthode,
+                  linetype=Validation), alpha = 0.3)+
   
   geom_line( aes(
-    color = method,
-    linetype=type_val
+    color = Méthode,
+    linetype=Validation
   ) , size = 1) +
   
-  geom_point(aes(color = method,
-                 shape=type_val) , 
+  geom_point(aes(color = Méthode,
+                 shape=Validation) , 
              size = 2) +
   
   geom_vline(xintercept = 2000, 
@@ -152,7 +112,8 @@ results_summaryV %>%
   ) +
   
   
-  facet_grid(indice2~approach, scales= "free") +
+  facet_grid(indice2~Approche, scales= "free",
+             labeller=labeller(Approche=supp.labs)) +
   labs(
     x = "Taille de l'échantillon (calibration)",
     y = "Indice",
