@@ -92,17 +92,17 @@ group_by(sample_size, method, approach, type_val,rep) %>%
 results_summary <- tt %>%
   mutate(NSE = if_else(NSE<0,0,NSE)) %>%
   group_by(sample_size, method, approach, type_val) %>%
-  summarise(across(c(ME, MAE, RMSE, r, r2, NSE, Cb), 
+  summarise(across(c(ME, MAE, RMSE, r, r2, NSE, CCC), 
                    mean, na.rm = TRUE),
             .groups = "drop"
   ) %>%
-  mutate(across(c(ME, MAE, RMSE, r, r2, NSE, Cb), round, digits = 4))
+  mutate(across(c(ME, MAE, RMSE, r, r2, NSE, CCC), round, digits = 4))
 
 results_summaryV <- tt %>%
   mutate(NSE = if_else(NSE<0,0,NSE)) %>%
   
   group_by(sample_size, method, approach, type_val) %>%
-  dplyr::summarise(across(c(ME, MAE, RMSE, r, r2, NSE, Cb),
+  dplyr::summarise(across(c(ME, MAE, RMSE, r, r2, NSE, CCC),
                    list(mean,sd), na.rm = TRUE),
             .groups = "drop" 
   ) 
@@ -127,21 +127,21 @@ N <- results_summaryN$n[1]
 supp.labs <- c("Désagrégation", "Ponctuelle")
 names(supp.labs) <- c("Centroide", "Ponctuelle")
 
-ind.labs <- c("ESMQ","NSE","Cb")
-names(ind.labs) <- c("RMSE","NSE","Cb")
+ind.labs <- c("ESMQ","NSE","CCC")
+names(ind.labs) <- c("RMSE","NSE","CCC")
 
 
 results_summaryV %>%
 
    filter(sample_size>400) %>%
-  pivot_longer(ME_1:Cb_2, names_to = "Indice", values_to = "valeur") |>
+  pivot_longer(ME_1:CCC_2, names_to = "Indice", values_to = "valeur") |>
   mutate(type = if_else(  grepl( "[1]", Indice ) ,"mean" , "sd" ) ,
          indice2 = str_split(Indice,"_",simplify = T)[,1]
          
   ) %>%
   
   pivot_wider(id_cols = !Indice,names_from = type, values_from = valeur) %>%
-  filter(indice2 %in% c("RMSE","NSE","Cb")) %>%
+  filter(indice2 %in% c("RMSE","NSE","CCC")) %>%
   mutate(sample_size = as.numeric(sample_size)) %>%
   
   ggplot(
