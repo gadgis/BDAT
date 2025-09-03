@@ -32,8 +32,9 @@ n=400
 
 nohup Rscript dégradation/script_principal_inla.R  arg 400 5 > test400.out&
 nohup Rscript dégradation/script_principal_inla.R  arg 600 5 > test600.out&
-nohup Rscript dégradation/script_principal_inla.R  arg 1000 5 > test2.out&
-nohup Rscript dégradation/script_principal_inla.R  arg 2000 5 > test3.out&
+  nohup Rscript dégradation/script_principal_inla.R  arg 1000 5 > test2.out&
+  nohup Rscript dégradation/script_principal_inla.R  arg 1500 5 > test2.out&
+  nohup Rscript dégradation/script_principal_inla.R  arg 2000 5 > test3.out&
 nohup Rscript dégradation/script_principal_inla.R  arg 3000 5 > test32.out&
 nohup Rscript dégradation/script_principal_inla.R  arg 4000 5 > test4.out&
 nohup Rscript dégradation/script_principal_inla.R  arg 5000 5 > test5000.out&
