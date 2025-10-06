@@ -22,25 +22,25 @@ Myeval <- function(x, y){
   data.frame(ME = ME, MAE = MAE, RMSE = RMSE, r = r, r2 = r2, NSE = NSE, CCC = CCC, Cb = Cb)
 }
 
-#pattern <- "Xval2_pH*"
-# pattern <- "Xval2_arg*"
-# 
-# lf <- list.files(path = "output/", 
-#                  pattern = pattern,
-#                 full.names = T
-#                  )
-# 
-# 
-# 
-# pred_INLA_full <- bind_rows(
-#   lapply(lf[], function(x) {
-#     dt <- readRDS(x)
-#     dt$sample_size = as.numeric(dt$sample_size)
-#     dt
-#   } ) 
-#   ) 
+pattern <- "Xval2_pH*"
+pattern <- "Xval2_arg*"
 
-pred_INLA_full <-readRDS("Xval_pH600_800_1000_1500_2000_3000_4000_5000_6000_7000_8000_9000_10000.rds") 
+lf <- list.files(path = "output/",
+                 pattern = pattern,
+                full.names = T
+                 )
+
+
+
+pred_INLA_full <- bind_rows(
+  lapply(lf[], function(x) {
+    dt <- readRDS(x)
+    dt$sample_size = as.numeric(dt$sample_size)
+    dt
+  } )
+  )
+
+# pred_INLA_full <-readRDS("Xval_pH600_800_1000_1500_2000_3000_4000_5000_6000_7000_8000_9000_10000.rds") 
 
 pred_INLA_full<- pred_INLA_full %>%
   rename(RF=pred,
@@ -62,11 +62,7 @@ tt <- pred_INLA_full %>%
 
 results_summary <- tt %>%
   mutate(NSE = if_else(NSE<0,0,NSE)) %>%
-<<<<<<< HEAD
-  group_by(sample_size, method, approach, type_val) %>%
-=======
   group_by(sample_size, Méthode, Approche, Validation) %>%
->>>>>>> 2368e3baadc7f835855c9f6559923e6d68ea20a9
   summarise(across(c(ME, MAE, RMSE, r, r2, NSE, CCC), 
                    mean, na.rm = TRUE),
             .groups = "drop"
@@ -76,17 +72,10 @@ results_summary <- tt %>%
 results_summaryV <- tt %>%
   mutate(NSE = if_else(NSE<0,0,NSE)) %>%
   
-<<<<<<< HEAD
-  group_by(sample_size, method, approach, type_val) %>%
-  dplyr::summarise(across(c(ME, MAE, RMSE, r, r2, NSE, CCC),
-                   list(mean,sd), na.rm = TRUE),
-            .groups = "drop" 
-=======
   group_by(sample_size, Méthode, Approche, Validation) %>%
   dplyr::summarise(across(c(ME, MAE, RMSE, r, r2, NSE, CCC),
                           list(mean,sd), na.rm = TRUE),
                    .groups = "drop" 
->>>>>>> 2368e3baadc7f835855c9f6559923e6d68ea20a9
   ) 
 
 results_summaryN <- tt %>%
@@ -106,23 +95,12 @@ results_summaryN <- tt %>%
 supp.labs <- c("Désagrégation", "Données Ponctuelles")
 names(supp.labs) <- c("Centroide", "Ponctuelle")
 
-<<<<<<< HEAD
-ind.labs <- c("ESMQ","NSE","CCC")
-names(ind.labs) <- c("RMSE","NSE","CCC")
-
-=======
 ind.labs <- c("ESMQ","NSE","Ccc")
 names(ind.labs) <- c("RMSE","NSE","CCC")
->>>>>>> 2368e3baadc7f835855c9f6559923e6d68ea20a9
 
 results_summaryV %>%
-  pivot_longer(ME_1:CCC_2, names_to = "Indice", values_to = "valeur") |>
-
-<<<<<<< HEAD
    filter(sample_size>400) %>%
   pivot_longer(ME_1:CCC_2, names_to = "Indice", values_to = "valeur") |>
-=======
->>>>>>> 2368e3baadc7f835855c9f6559923e6d68ea20a9
   mutate(type = if_else(  grepl( "[1]", Indice ) ,"mean" , "sd" ) ,
          indice2 = str_split(Indice,"_",simplify = T)[,1]) %>%
   
