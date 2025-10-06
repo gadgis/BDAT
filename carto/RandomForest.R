@@ -55,43 +55,33 @@ classement_brt_approche = attStats(result_brt_approche) %>%
   arrange(desc(medianImp))                        #pareil pour les covariables plus complètes
 
 # sauvegarde des covariables sélectionnées
+
 saveRDS(cov_brt, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "_cov_brt.rds"))
 
-#3. Création du jeu de données d'entrée pour la calibration du modèle
+#3. Création du jeu de données d'entrée pour la calibration du modèle----
 
 cov_brt = c(name, cov_brt)
 datacov_shrt = datacov[cov_brt]                   #récupération dans datacov des colonnes conservées
 
 SOC.task = makeRegrTask(data = datacov_shrt, target = name)
 
-# Rough Estimation of the Tuning time
+# Estimation approximative du temps de réglage
 estimateTimeTuneRanger(SOC.task,num.threads = 60,
                        num.trees = ntree)
 
-# Tuning process (takes around 1 minute); Tuning measure is the multiclass brier score
+#4.Tunning des hyperparamètres du modèle Random Forest----
 res = tuneRanger(SOC.task,
                  num.trees = ntree,
                  iters = 100,
                  num.threads = 60)
 
 
+# Affichage des hyperparamètres optimaux
 
 res$recommended.pars$mtry
 res$recommended.pars$min.node.size
 
-
-
-# fomula.ranger <- as.formula(paste0(name,"~."))
-# QRF_Mod.G <- ranger(formula = fomula.ranger ,
-#                     data = datacov_shrt,
-#                     num.trees = ntree,
-#                     min.node.size = res$recommended.pars$min.node.size ,
-#                     quantreg = TRUE,
-#                     max.depth = 15, 
-#                     mtry=res$recommended.pars$mtry ,
-#                     importance="permutation", 
-#                     scale.permutation.importance = TRUE, #division par l'écart-type de la variable (mise des permutations entre 0 et 1)
-#                     keep.inbag = F)
+#5.Calibration du modèle Random Forest avec les hyperparamètres optimaux----
 
 fomula.ranger <- as.formula(paste0(name,"~."))
 RF_Mod.G <- ranger(formula = fomula.ranger ,
@@ -104,7 +94,9 @@ RF_Mod.G <- ranger(formula = fomula.ranger ,
                     importance="permutation", 
                     scale.permutation.importance = TRUE, #division par l'écart-type de la variable (mise des permutations entre 0 et 1)
                     keep.inbag = F)
-#Variable importance
+
+#6. Classification de l'importance des variables----
+
 Imp_RF <- data.frame(RF_Mod.G$variable.importance)
 Imp_RF$Vars <- row.names(Imp_RF)
 Imp_RF <- Imp_RF[order(Imp_RF$RF_Mod.G.variable.importance,decreasing = T),]
@@ -112,6 +104,8 @@ Imp_RF <- Imp_RF[order(Imp_RF$RF_Mod.G.variable.importance,decreasing = T),]
 
 Imp_RF <- Imp_RF %>%
   left_join(df_vars, by = "Vars")
+
+# sauvegarde de l'odre d'importance des covariables
 
 saveRDS(Imp_RF, file=paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"_Imp_RF.rds"))
 
@@ -124,6 +118,7 @@ Imp_RF_top10 <- Imp_RF %>%
   arrange(desc(importance)) %>%
   slice(1:10)
 
+# 7. Graphique de l'importance des variables----
 varimp <- ggplot(Imp_RF_top10, 
                  aes(x = reorder(label, importance), 
                      y = importance,
@@ -154,22 +149,15 @@ varimp <- ggplot(Imp_RF_top10,
 
 print(varimp)
 
-# Predictions
+# 8. Predictions sur la grille spatiale ----
 
-#spatial prediction
+# préparation des données de prédiction
 
-
-# prepare for predction the new data table
 testD <- gXY %>% 
   dplyr::select(all_of(cov_brt[-1])) 
 
 
-
-# QRF_Median <- predict(QRF_Mod.G,
-#                       testD,
-#                       type = "quantiles",
-#                       quantiles =  c(0.05,0.5,0.95),
-#                       num.threads = kmax )$predictions
+#prediction
 
 QRF_Median2 <- predict(RF_Mod.G,
                       testD,
@@ -182,13 +170,17 @@ QRF_Median50 <- bind_cols(gXY %>%
                             dplyr::select(x,y)     ,
                           QRF_Median = QRF_Median2)
 
+#rasterisation des prédictions 
+
 r <- rast(QRF_Median50, type="xyz")
 
 
 terra::writeRaster(r, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "qrf.tif"), overwrite = TRUE)
 
 
-# k fold -------------
+#9. Evaluation du modèle par validation croisée-----
+
+#initialisation
 
 print("Validation croisée----------------")
 
@@ -201,7 +193,7 @@ resuXval <-
 
             print(i)
 
-            # collecter les # des lignes (gérer les doublons)
+            # Calibration sur les k-1 groupes
             nblignes = which( datacov$id %in% datacov$id[ fold[[i]] ] )
 
             RF_Mod.G <- ranger(formula = fomula.ranger ,
@@ -216,7 +208,7 @@ resuXval <-
                                 scale.permutation.importance = FALSE, #division par l'écart-type de la variable (mise des permutations entre 0 et 1)
                                 keep.inbag = F)
 
-
+            # Prédiction sur le groupe mis de côté
             datacov$predRF[ nblignes ] <- predict(RF_Mod.G,
                                                     datacov_shrt[ nblignes , ],
                                                     num.threads = kmax )$prediction
@@ -225,6 +217,7 @@ resuXval <-
 
           }
 
-
+#Calcul des indicateurs de performance
 resuXvalQRF <-  Myeval(datacov$predRF,   datacov[,name] )
 
+#================================================FIN DU SCRIPT====================================================#

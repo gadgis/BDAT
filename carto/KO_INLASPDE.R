@@ -20,6 +20,8 @@
 # Modification : 06-10-2025
 #===================================================================================================================#
 
+#================================================DEBUT DU SCRIPT====================================================#
+
 # il faut récupérer une licence sur Pardiso : inla.pardiso()
 #inla.setOption(pardiso.license ="82F70E96BE7DA6A5956D4DF8F31E127ACCB33C981DE83F430BA469A2")
 
@@ -170,3 +172,4 @@ resuXval <-
 #Calcul des indicateurs de performance
 resuXvalTKO <-  Myeval(datacov$predINLAKO,   datacov[,name] )
 
+#================================================FIN DU SCRIPT====================================================#
