@@ -188,7 +188,7 @@ r <- rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "qrf
 
 dataINLA$qrf <-  terra::extract(  r , vect(dataINLA)  )$QRF_Median
 
-source("C:/Users/gadiaga/Documents/stage_bdat/carto/KO_INLASPDE.R")
+source("carto/KO_INLASPDE.R")
 
 resuXvalTKO
 
@@ -196,7 +196,7 @@ resuXvalTKO
 # 5. Krigeage avec dérive externe -------------
 
 
-source("C:/Users/gadiaga/Documents/stage_bdat/carto//KED_INLASPDE.R")
+source("carto//KED_INLASPDE.R")
 resuXvalpredINLAKED
 
 # 6. Cartographie des résultats-----
