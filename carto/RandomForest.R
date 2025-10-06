@@ -1,31 +1,41 @@
-# RandomForest ----
+#===================================================================================================================#
+# Script :      Random Forest 
 
-##### BORUTA #####
-### A CHANGER SI CHANGE NB DE COVARIABLES
+# Institution : UMR Infos&Sols /GisSol/BDAT
+
+# Description : Script pour la prédiction des propriétés des sols en utilisant 
+#               la méthode Random Forest avec INLA SPDE 
+
+# Auteurs :     Mame Cheikh Gadiaga, Nicolas Saby
+
+# Contact :     gadiagacheikh1998@gmail.com | nicolas.saby@inrae.fr
+
+# Creation :    23-04-2025
+
+# Entrees :     Observations ponctuelles et les covariables 
+
+# Sorties :     Prediction de la propriété cible, indicateurs de performance, Ordre d'importance des covariables
+
+# Modification : 06-10-2025
+#===================================================================================================================#
+
+#==========================================DEBUT DU SCRIPT=========================================================#
+
+# Liste des packages utilisés -----
+
+library(iml) # pour l'interprétabilité des modèles de machine learning
+library(mlr) # pour la création et le tuning des modèles de machine learning
+
+#1. Définir les types de variables----
 
 X = datacov[,idcovs]                 # X: variables indépendantes -> covariables
-Y = datacov[[idvar]]                  # Y: Variable cible (target variable, outcome) -> ETM
+Y = datacov[[idvar]]                  # Y: Variable cible (target variable, outcome) -
 
 taille = ncol(X)
-#Tune du mtry
-# bestmtry = tuneRF(X,Y,                            #tune du RF pour déterminer le meilleur mtry
-#                   stepFactor = 1.3,
-#                   mtry = round(sqrt(taille)),
-#                   improve = 1e-5,
-#                   ntree = ntree,
-#                   plot = FALSE)           #utilisation du même ntree que soil 2.0 pour leur rfe
-# 
 
+#2. Sélélction des covariables pertinantes par Boruta----
 
-
-library(iml)
-library(mlr)
-
-
-
-
-# #Boruta
-result_brt = Boruta(X, Y,                         #classification de l'importance des covariables par boruta
+result_brt = Boruta(X, Y,                         
                     mtry = min(taille, floor(sqrt(taille))) ,
                     min.node.size = 3 ,
                     ntree = ntree)
@@ -44,13 +54,10 @@ classement_brt = Stats_brt %>%
 classement_brt_approche = attStats(result_brt_approche) %>%
   arrange(desc(medianImp))                        #pareil pour les covariables plus complètes
 
-# classement_brt 
+# sauvegarde des covariables sélectionnées
 saveRDS(cov_brt, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "_cov_brt.rds"))
 
-#sauvegarde des covariables sélectionnées
-#cov_brt<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"_cov_brt.rds")
-
-#Création du tableau des covariables séléctionnées
+#3. Création du jeu de données d'entrée pour la calibration du modèle
 
 cov_brt = c(name, cov_brt)
 datacov_shrt = datacov[cov_brt]                   #récupération dans datacov des colonnes conservées

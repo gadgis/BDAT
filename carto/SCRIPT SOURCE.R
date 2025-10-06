@@ -1,16 +1,23 @@
-#===========================================================================================================
-# Script : SCRIPT SOURCE.R
+#===========================================================================================================#
+# Script : Script principal 
+
 # Institution : UMR Infos&Sols /GisSol/BDAT
+
 # Description : Script pour la cartographie des propriétés des sols en utilisant la méthode Random Forest 
 #               Krigeage ordinaire et Krigeage avec Dérive Externe 
 
 # Auteurs :     Mame Cheikh Gadiaga, Nicolas Saby
+
 # Contact :     gadiagacheikh1998@gmail.com | nicolas.saby@inrae.fr
+
 # Creation :    23-04-2025
-# Entrees :     Données ponctuelles de la BDAT et IGCS sur les propriétés des sols 
+
+# Entrees :     Données ponctuelles de la BDAT et IGCS sur les propriétés des sols
+
 # Sorties :     Carte des propriétés des sols sur la zone agricole
+
 # Modification : 06-10-2025
-#===========================================================================================================
+#===========================================================================================================#
 
 
 #DEBUT DU SCRIPT------------------------------------------------------------------------------------------
@@ -155,7 +162,7 @@ colnames(datacov)
 idcovs = 2:65
 idvar = 66
 
-source("C:/Users/gadiaga/Documents/stage_bdat/carto/RandomForest.R")
+source("carto/RandomForest.R")
 
 resuXvalQRF
 
