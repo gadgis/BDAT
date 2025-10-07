@@ -22,25 +22,25 @@ Myeval <- function(x, y){
   data.frame(ME = ME, MAE = MAE, RMSE = RMSE, r = r, r2 = r2, NSE = NSE, CCC = CCC, Cb = Cb)
 }
 
-#pattern <- "Xval2_pH*"
-# pattern <- "Xval2_arg*"
-# 
-# lf <- list.files(path = "output/", 
-#                  pattern = pattern,
-#                 full.names = T
-#                  )
-# 
-# 
-# 
-# pred_INLA_full <- bind_rows(
-#   lapply(lf[], function(x) {
-#     dt <- readRDS(x)
-#     dt$sample_size = as.numeric(dt$sample_size)
-#     dt
-#   } ) 
-#   ) 
+pattern <- "Xval2_pH*"
+pattern <- "Xval2_arg*"
 
-pred_INLA_full <-readRDS("Xval_pH600_800_1000_1500_2000_3000_4000_5000_6000_7000_8000_9000_10000.rds") 
+lf <- list.files(path = "output/",
+                 pattern = pattern,
+                full.names = T
+                 )
+
+
+
+pred_INLA_full <- bind_rows(
+  lapply(lf[], function(x) {
+    dt <- readRDS(x)
+    dt$sample_size = as.numeric(dt$sample_size)
+    dt
+  } )
+  )
+
+# pred_INLA_full <-readRDS("Xval_pH600_800_1000_1500_2000_3000_4000_5000_6000_7000_8000_9000_10000.rds") 
 
 pred_INLA_full<- pred_INLA_full %>%
   rename(RF=pred,
@@ -99,8 +99,8 @@ ind.labs <- c("ESMQ","NSE","Ccc")
 names(ind.labs) <- c("RMSE","NSE","CCC")
 
 results_summaryV %>%
+   filter(sample_size>400) %>%
   pivot_longer(ME_1:CCC_2, names_to = "Indice", values_to = "valeur") |>
-
   mutate(type = if_else(  grepl( "[1]", Indice ) ,"mean" , "sd" ) ,
          indice2 = str_split(Indice,"_",simplify = T)[,1]) %>%
   

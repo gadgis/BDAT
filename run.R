@@ -1,11 +1,11 @@
 dataINLA = train_aggr #calib_points 
 data_test = test_data
-name = "pH"
+name = "arg"
 type = c("KO")
 approach = c("Ponctuelle")
 type_val = c("Classique")
 NomsCoord = c("x", "y")
-n = 4000
+n = 1500
 repets = 1
 k = 30
 rep = 1
@@ -30,14 +30,17 @@ n=400
 
 
 
-nohup Rscript dégradation/script_principal_inla.R  arg 400 5 > test400.out&
-nohup Rscript dégradation/script_principal_inla.R  arg 600 5 > test600.out&
-nohup Rscript dégradation/script_principal_inla.R  arg 1000 5 > test2.out&
-nohup Rscript dégradation/script_principal_inla.R  arg 2000 5 > test3.out&
-nohup Rscript dégradation/script_principal_inla.R  arg 3000 5 > test32.out&
+nohup Rscript dégradation/script_principal_inla.R  arg 400 30 > test400.out&
+nohup Rscript dégradation/script_principal_inla.R  arg 600 30 > test600.out&
+  nohup Rscript dégradation/script_principal_inla.R  arg 1000 30 > test2.out&
+  nohup Rscript dégradation/script_principal_inla.R  arg 1500 5 > test2s.out&
+  nohup Rscript dégradation/script_principal_inla.R  arg 2000 30 > test3.out&
+  nohup Rscript dégradation/script_principal_inla.R  arg 2500 5 > test3a.out&
+  nohup Rscript dégradation/script_principal_inla.R  arg 3000 30 > test32.out&
 nohup Rscript dégradation/script_principal_inla.R  arg 4000 5 > test4.out&
-nohup Rscript dégradation/script_principal_inla.R  arg 5000 5 > test5000.out&
-nohup Rscript dégradation/script_principal_inla.R  arg 7500 5 > test6.out&
+  nohup Rscript dégradation/script_principal_inla.R  arg 5000 5 > test5000.out&
+  nohup Rscript dégradation/script_principal_inla.R  arg 6000 30 > test6000.out&
+  nohup Rscript dégradation/script_principal_inla.R  arg 7500 5 > test6.out&
   
   
   nohup Rscript dégradation/script_principal_inla.R  pH 200 5 > test2a.out&
