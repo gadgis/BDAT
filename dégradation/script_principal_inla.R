@@ -1,26 +1,51 @@
-# Script principal pour faire de la validation croisée en intégrant la dégradation 
+#=============================================================================================================================#
+# Script :      Script principale pour la validation croisée intégrant un processus de dégradation de l'information ponctuelle
 
-#L'idée est de partir des données ponctuelles (contenant les covaribles et les valeurs de la propriété cible).
-#Suivant les différentes voies de validation croisée (classique ou spatiale), on définit des folds et à chaque itérartion,
-#on calivre sur les k-1 folds et on teste sur le fold restant. Mais la calibration ne se fait pas sur l'intégralité des points
-#des k-1 folds mais plutut sur un échantillon ce qui permet de simuler la dégradation de l'information.
+# Institution : UMR Infos&Sols /GisSol/BDAT
 
-#Pour chaque échantillon on implémente d'abord le Random Forest pour avoir les prédictions, les metriques, les identifiant' numéro folds,
-#id, numéro repetition) pour ensuite les utiliser et eviter la perte d'information afin d'implémenter le KO et le KED.
+# Description : La validation croisée est une technique utilisée pour évaluer la performance prédictive d'un modèle en le 
+#               testant sur des sous-ensembles de données . Elle pemet d'évaluer la capacité de généralisation du modèle.
+#               Pour effectuer la validation croisée, il est nécessaire de diviser le jeu de données en k groupes. k itérations sont 
+#               effectuées où à chaque itération un groupe est utilisé comme jeu de test et les k-1 autres groupes comme jeu de calibration.
+#               Cette séparation des données en groupes peut se faire de façon classique comme spatiale
+#               La forme classique consiste à diviser aléatoirement le jeu de données en k groupes alors que celle 
+#               spatiale divise les données en k groupes en fonction des communes donc les points utilisés pour la calibration appartiennent au 
+#               même groupe de communes.
+#               Dans un soucis d'évaluer l’influence de la densité d’échantillonnage sur la qualité des prédictions et la sensibilité 
+#               des modèles utilisées face à une diminution de la densité d’échantillonnage du jeu de calibration, la dégradation est intégrée 
+#               dans le processus de validation croisée. L'idée est de  réduire la taille de l'échantillon
+#               utilisé pour la calibration du modèle. Ainsi à chaque itération un échantillon du pool de calibration (k-1 groupes) est prélevé
+#               aléatoirement pour calibrer le modèle. Ce processus est repeté 30 fois pour chaque taille d'échantillon et pour chaque forme 
+#               de validation croisée (classique et spatiale).
+
+
+# Auteurs :     Mame Cheikh Gadiaga, Nicolas Saby
+
+# Contact :     gadiagacheikh1998@gmail.com | nicolas.saby@inrae.fr
+
+# Creation :    21-07-2025
+
+# Entrees :     Jeu de données sur les propriétés des sols, scripts utilitaireS pour le RF, KO et KED
+
+# Sorties :     Tableu avec les valeurs des indicateurs de performance pour chaque modèle et selon la taille d'échantillon la forme de la CV 
+#               et l4approche de CSMS
+
+# Modification : 08-10-2025
+#===========================================================================================================================#
+
+#================================================DEBUT DU SCRIPT============================================================#
+
+
 
 #1. Chargement des packages----
 
 library(sf)
-# library(tmap)
 library(readxl)
 library(tidyr)
 library(dplyr)
 library(foreach)
-library(raster) # pourquoi Raster????
+library(raster) 
 library(purrr)
-# library(ggpubr)
-# library(ggnewscale)
-# library(doParallel)
 library(tuneRanger)
 library(INLA)
 library(inlabru)
@@ -30,13 +55,14 @@ library(caret)
 
 # setwd("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R")
 
-#2. Chargement des fonctions RF, INLA  Myeval et dataINLA----
+#2. Chargement des fonctions RF, INLA, geomasking,  Myeval----
 
 source("dégradation/fonction_RF.R")
 
 source("dégradation/fonction_inla.R")
+
 source("dégradation/fonction_geomasking.R")
-#Myeval
+
 Myeval <- function(x, y){
   ME <- mean(y - x, na.rm = TRUE)
   RMSE <- sqrt(mean((y - x)^2, na.rm = TRUE))
@@ -56,38 +82,41 @@ Myeval <- function(x, y){
   data.frame(ME = ME, MAE = MAE, RMSE = RMSE, r = r, r2 = r2, NSE = NSE, CCC = CCC, Cb = Cb)
 }
 
-
-# dataINLA
-
-# Paramètres
-
-#!/usr/bin/env Rscript
-args = commandArgs(trailingOnly=TRUE)
-
-name <- args[1]  #arg
-sample_sizes <- args[2] # c(500,1000 ) # c(600,800,1000,1200,1300,1400,1600,1800,2000,3000,4000,5000,6000,7000,7600)
-repets <- args[3]
-
-
-
-kmax <- 30
-ntree <- 350
-NomsCoord <- c("x", "y")
-types_validation <- c("Classique", "Spatiale")
-drive = "/media/communs_infosol/" # ou "Y:/"
-DistanceGeomasking = 0
-
-#3. Chargement des données---- 
+#2. Chargement des données---- 
 
 com <- st_read( paste0(drive, "BDAT/traitement_donnees/MameGadiaga/data/commune_53.shp") )
+
 centroides_communes <- st_centroid(com) %>% dplyr::select(INSEE_COM, X = X_CENTROID, Y = Y_CENTROID) %>% st_drop_geometry()
 
 datacov <- readRDS(paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/donnees_ponctuelles", name, ".rds"))
+
 moyenne_covariable <- readRDS(paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/moyenne_covariable", name, ".rds"))
 
 cov_brt <- readRDS(paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/", name, "_cov_brt.rds"))
 
-#4. loop of the ----
+
+#3. Definir les paramètres----
+
+#!/usr/bin/env Rscript
+args = commandArgs(trailingOnly=TRUE)
+
+name <- args[1]  #nom de la variable cible (ex. "arg" ou "pH")
+
+sample_sizes <- args[2] #tailles d'échantillon de calibration pour la dégradation,
+#                              données sous forme de liste séparée par des virgules
+#                              (ex. "500,1000,2000")
+
+repets <- args[3] #nombre de répétitions par taille d’échantillon (entier)
+kmax <- 30 #nombre de coeurs pour la parallelisation
+ntree <- 350  #nombre d'arbres pour la RF
+NomsCoord <- c("x", "y") #noms des colonnes des coordonnées
+types_validation <- c("Classique", "Spatiale") #types de validation croisée
+drive <- if (file.exists("/media/communs_infosol/")) "/media/communs_infosol/" else "Y:/" #chemin d'accès aux données
+DistanceGeomasking = 0
+
+
+
+#3. loop of the ----
 
 
 cat("\n==============  Starting loops ===============\n")
