@@ -1,4 +1,40 @@
-run_rf <- function(approach = c("Ponctuelle", "Centroide"),
+#=============================================================================================================================#
+# Script :      Script utilitaire pour le modèle de Random Forest
+
+# Institution : UMR Infos&Sols /GisSol/BDAT
+
+# Description : Ce script fournit la fonction utilitaire `run_rf()` qui entraîne un modèle
+#               Random Forest sur un jeu d’apprentissage puis prédit sur un jeu test, avec
+#               réglage automatique d’hyperparamètres.
+#
+#               D'abord on prépare une tâche de régression (mlr) à partir de `data_train` où :
+#                   - cible = `name`
+#                   - covariables = colonnes listées dans `cov_brt`
+
+#               Ensuite on effectue un tuning via `tuneRanger` (10 itérations) pour estimer
+#              `mtry` et `min.node.size`, 
+        
+#               Enfin on entraîne un modèle `ranger`(ntree = 350, max.depth = 15, importance = "permutation").
+
+# Auteurs :     Mame Cheikh Gadiaga, Nicolas Saby
+
+# Contact :     gadiagacheikh1998@gmail.com | nicolas.saby@inrae.fr
+
+# Creation :    21-07-2025
+
+# Entrees :     Jeu de données sur les propriétés des sols, les variables importantes retenues (cov_brt)
+
+# Sorties :     data.frame du jeu test avec colonnes id, la cible (name), INSEE_COM, NomsCoord et
+#               la prédiction RF pred
+
+# Modification : 08-10-2025
+#===========================================================================================================================#
+
+#================================================DEBUT DU SCRIPT============================================================#
+
+
+
+run_rf <- function(approach = c("Ponctuelle", "Désagrégation"),
                    type_val = c("Classique", "Spatiale"),
                    data_train,
                    data_test,
@@ -14,10 +50,7 @@ run_rf <- function(approach = c("Ponctuelle", "Centroide"),
   
   # Nom de la colonne de prédiction
   pred_col <- "pred"
-  # paste0("predRF_", 
-  #                    ifelse(approach == "Ponctuelle", "P", "C"),
-  #                    ifelse(type_val == "Classique", "C", "S"))
-  # 
+  
   # Apprentissage
   rf_task <- makeRegrTask(data = data_train[, c(name, cov_brt)], target = name)
   res_tune <- tuneRanger(rf_task, 
@@ -53,7 +86,7 @@ run_rf <- function(approach = c("Ponctuelle", "Centroide"),
     mutate(method = paste0("RF_", substr(approach, 1, 1), substr(type_val, 1, 1)))
   
   return(list(
-    predCal = predCal, # Pourquoi deux fois preds?????
+    predCal = predCal, #deérive externe pour le KED
     evaluation = eval,
     detail = test[, c("id", name, "INSEE_COM", NomsCoord, pred_col)]
     )

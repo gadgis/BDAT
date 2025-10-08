@@ -2,7 +2,7 @@ run_inla_spde_core <- function(dataINLA,
                                data_test,
                                name,
                                type = c("KO", "KED"),
-                               approach = c("Ponctuelle", "Centroide"),
+                               approach = c("Ponctuelle", "Désagrégation"),
                                type_val = c("Classique", "Spatiale"),
                                NomsCoord = c("x", "y")
                                ) {
