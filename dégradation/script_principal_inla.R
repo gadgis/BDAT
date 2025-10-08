@@ -399,7 +399,7 @@ cat("FIN DES CALCULS--------------------")
 
 pred_RF_full <- bind_rows(results_rf_all)
 
-# 6. Save file -------------------- 
+# 6. Sauvegarde des fichiers-----
 
 if(drive == "Y:/") {
   Myfile = paste0(drive, 
