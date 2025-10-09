@@ -430,9 +430,6 @@ if(drive == "Y:/") {
   }
   
 
-
-                       
-
 saveRDS(pred_RF_full, 
         Myfile)
   

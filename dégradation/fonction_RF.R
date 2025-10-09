@@ -33,7 +33,6 @@
 #================================================DEBUT DU SCRIPT============================================================#
 
 
-
 run_rf <- function(approach = c("Ponctuelle", "Désagrégation"),
                    type_val = c("Classique", "Spatiale"),
                    data_train,
@@ -51,7 +50,8 @@ run_rf <- function(approach = c("Ponctuelle", "Désagrégation"),
   # Nom de la colonne de prédiction
   pred_col <- "pred"
   
-  # Apprentissage
+  # Apprentissage et calibration du modèle
+  
   rf_task <- makeRegrTask(data = data_train[, c(name, cov_brt)], target = name)
   res_tune <- tuneRanger(rf_task, 
                          num.trees = ntree,
@@ -72,11 +72,12 @@ run_rf <- function(approach = c("Ponctuelle", "Désagrégation"),
     keep.inbag = FALSE
   )
   
-  # Jeu de test
+  # Identification du jeu test
   test <- data_test[, c("id", name, "INSEE_COM", NomsCoord, cov_brt)]
   
   # Prédiction
-  predCal <- rf_model$predictions
+  
+  predCal <- rf_model$predictions #prédiction qui vont servir dans l'approche KED
   preds <- predict(rf_model, data = test[, cov_brt], num.threads = kmax)$predictions
   preds <- round(preds, 2)
   test[[pred_col]] <- preds
@@ -86,7 +87,7 @@ run_rf <- function(approach = c("Ponctuelle", "Désagrégation"),
     mutate(method = paste0("RF_", substr(approach, 1, 1), substr(type_val, 1, 1)))
   
   return(list(
-    predCal = predCal, #deérive externe pour le KED
+    predCal = predCal, #dérive externe pour le KED
     evaluation = eval,
     detail = test[, c("id", name, "INSEE_COM", NomsCoord, pred_col)]
     )

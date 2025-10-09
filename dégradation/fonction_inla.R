@@ -1,3 +1,37 @@
+#=============================================================================================================================#
+# Script :      Script utilitaire pour le modèle de Random Forest
+
+# Institution : UMR Infos&Sols /GisSol/BDAT
+
+# Description : Ce script fournit la fonction utilitaire `run_inla_spde_core()` qui entraîne un modèle
+#               de Krigeage ordinaire et de Krigeage avec dérive externe sur un jeu d’apprentissage
+#               puis prédit sur un jeu test.
+#
+#               D'abord les données sont convertit  en objets `sp. Ensuite un maillage (mesh) 2D est modélisé
+#               avec `INLA::inla.mesh.2d` et un champ spatial Matérn est définit via `inla.spde2.pcmatern`.
+
+#               Puis le modèle est définit puis ajusté :
+#                   - KO  (Krigeage Ordinaire) : Intercept + champ spatial,
+#                   - KED (Krigeage à Dérive Externe) : Intercept + dérive linéaire `pred` + champ spatial.
+
+#               Enfin les prédictions sont effectuées sur le jeu test via `inlabru::predict()`.
+
+# Auteurs :     Mame Cheikh Gadiaga, Nicolas Saby
+
+# Contact :     gadiagacheikh1998@gmail.com | nicolas.saby@inrae.fr
+
+# Creation :    21-07-2025
+
+# Entrees :     data.frame d’apprentissage et de test avec des colonnes pour la variable cible `name`, 
+#               les coordonnées `NomsCoord`, les predictions du Random Forest pour le KED. 
+
+# Sorties :     data.frame du jeu test avec la prédiction (median) des modèles de KO et KED
+
+# Modification : 09-10-2025
+#===========================================================================================================================#
+
+#================================================DEBUT DU SCRIPT============================================================#
+
 run_inla_spde_core <- function(dataINLA, 
                                data_test,
                                name,
@@ -11,10 +45,8 @@ run_inla_spde_core <- function(dataINLA,
   approach <- match.arg(approach)
   type_val <- match.arg(type_val)
   
-  # pred_col <- paste0("predINLA", type, "_", substr(approach, 1, 1), substr(type_val, 1, 1))
   
-  # id_point_vect <- dataINLA$id_point
-  
+  # Transformation en sp pour INLA
   dataINLA$elt <- dataINLA[,name]
   
   coords <- dataINLA[, NomsCoord]
@@ -22,11 +54,11 @@ run_inla_spde_core <- function(dataINLA,
   coordinates(dataINLA) <- NomsCoord
   proj4string(dataINLA) <- CRS("epsg:2154")
   
-
-  
   coordinates(data_test) <- NomsCoord
   proj4string(data_test) <- CRS("epsg:2154")
-
+  
+  # Création du mesh
+  
   max.edge <- diff(range(coords[, 1])) / (3 * 5)
   bound.outer <- diff(range(coords[, 1])) / 3
   mesh3 <- inla.mesh.2d(
@@ -42,6 +74,7 @@ run_inla_spde_core <- function(dataINLA,
     prior.range = c(500, 0.01)
   )
   
+  # Définition du modèle
   cmp <- if (type == "KO") {
     elt ~ Intercept(1) + field(coordinates, model = matern)
   } else {
@@ -54,7 +87,7 @@ run_inla_spde_core <- function(dataINLA,
     ~Intercept + rfpred + field
   }
   
-  
+  # Ajustement du modèle
     fit <- bru(
     cmp,
     data = dataINLA,
@@ -66,19 +99,8 @@ run_inla_spde_core <- function(dataINLA,
   
   gc()
   
-  # # Sécurisation de la jointure
-  # data_test_unique <- data_test[, c("id", name)] %>% distinct(id, .keep_all = TRUE)
-  # 
-  # fitted_df <- data.frame(
-  #   id = id_point_vect,
-  #   pred = fit$summary.fitted.values$mean[1:length(id_point_vect)]
-  # ) %>%
-  #   filter(!is.na(id)) %>%
-  #   left_join(data_test_unique, by = "id") %>%
-  #   rename(obs = !!name)
-  # 
   
-
+  # Prédictions
    predObj <-  predict(fit,
                        data_test ,
                       cmpPred  
