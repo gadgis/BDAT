@@ -43,7 +43,7 @@ library(rlang)
 
 # Paramètre : variable cible 
 
-name <- "pH"   # ex. "pH","CEC","C","clay","sand","silt"
+name <- "CEC"   # ex. "pH","CEC","C","arg,"sand","silt"
 
 # Correspondance BDAT -> nom standard
 map_bdat <- c(
@@ -221,7 +221,7 @@ igcs_agri <- igcs_agri %>%
     pH   = ph_eau,
     CEC  = cec,
     C    = carbone,
-    clay = argile,
+    arg = argile,
     silt = limon
   ) %>%
   st_transform(crs=2154)
@@ -234,7 +234,7 @@ cds <- st_coordinates(igcs_agri)
 igcs_agri <- igcs_agri %>% mutate(x=cds[,1], y=cds[,2])
 
 ###4.3.1. Transformation en dataframe ----
-igcs_agri_df <- igcs_agri %>% 
+igcs_agri <- igcs_agri %>% 
   rename(id_profil = id_prfl,
          top       = prof_sp,
          bottom    = prof_nf,
@@ -249,12 +249,12 @@ igcs_agri_df <- igcs_agri %>%
   )
 
 ###4.3.2. Filtrage des horizons sans limites définies + exclusion RMQS ----
-igcs_agri_df <- igcs_agri_df %>%
+igcs_agri_df <- igcs_agri %>%
   filter(!is.na(top), !is.na(bottom)) %>%
   filter(is.na(typ_pr_))   # exclut composites RMQS
 
 # Sauvegarde RMQS si besoin
-RMQS <- igcs_agri_df %>% filter( typ_pr_=="C" | typ_pr_=="F" )
+RMQS <- igcs_agri %>% filter( typ_pr_=="C" | typ_pr_=="F" )
 saveRDS(RMQS, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/RMQS.rds")
 
 ###4.3.4. Harmonisation des horizons (générique pour 'name') ----
