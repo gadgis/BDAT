@@ -21,11 +21,13 @@ Cette partie....
 ### 2. Extraction des covariables
 
 
-### 3. Calibration des modèles et cartographie <img src="carto/modeles_CSMS.png" align="right" width="500"/>
+### 3. Calibration des modèles et cartographie
+<img src="carto/modeles_CSMS.png" align="left" width="500"/>
 
 
 
-### 4. Expérience de dégradation de l'information spatiale <img src="dégradation/schema_degradation.png" align="right" width="500"/>
+### 4. Expérience de dégradation de l'information spatiale
+<img src="dégradation/schema_degradation.png" align="right" width="500"/>
 
 
     
