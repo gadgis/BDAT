@@ -57,9 +57,9 @@ library(caret)
 
 #2. Fonctions RF, INLA, geomasking,  Myeval----
 
-source("dégradation/fonction_RF.R")
+source("dégradation/41_fonction_RF.R")
 
-source("dégradation/fonction_inla.R")
+source("dégradation/42_fonction_KO_KED.R")
 
 source("dégradation/fonction_geomasking.R")
 

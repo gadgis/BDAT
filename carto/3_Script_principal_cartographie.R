@@ -162,7 +162,7 @@ colnames(datacov)
 idcovs = 2:65
 idvar = 66
 
-source("carto/RandomForest.R")
+source("carto/31_Calibration_RF.R")
 
 resuXvalQRF
 
@@ -188,7 +188,7 @@ r <- rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "qrf
 
 dataINLA$qrf <-  terra::extract(  r , vect(dataINLA)  )$QRF_Median
 
-source("carto/KO_INLASPDE.R")
+source("carto/32_Calibration_KO.R")
 
 resuXvalTKO
 
@@ -196,7 +196,7 @@ resuXvalTKO
 # 5. Krigeage avec dérive externe -------------
 
 
-source("carto//KED_INLASPDE.R")
+source("carto/33_Calibration_KED.R")
 resuXvalpredINLAKED
 
 # 6. Cartographie des résultats-----
