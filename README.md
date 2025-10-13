@@ -22,12 +22,20 @@ Cette partie....
 
 
 ### 3. Calibration des modèles et cartographie
-<img src="carto/modeles_CSMS.png" align="left" width="500"/>
+L'image suivante montre les des différents scénarios de spatialisation testés
+<p align="center">
+  <img src="carto/modeles_CSMS.png" width="500" alt="Modèles CSMS">
+</p>
 
 
 
 ### 4. Expérience de dégradation de l'information spatiale
-<img src="dégradation/schema_degradation.png" align="right" width="500"/>
+La dégradation consiste à faire évoluer le jeu de calibration de façon progressive en faisant dessous-échantillonnages aléatoires, à ajuster un nouveau modèle à partir de ce jeu de donné dégradé et à calculer les indicateurs de qualité de prédiction.
+Elle est implémenté lors de la procédure de validation croisée.
+La figure ci-après montre la procédure de validation
+<p align="center">
+  <img src="degradation/schema_degradation.png" width="500" alt="Schéma de dégradation">
+</p>
 
 
     
