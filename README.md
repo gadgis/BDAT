@@ -34,7 +34,7 @@ La dégradation consiste à faire évoluer le jeu de calibration de façon progr
 Elle est implémenté lors de la procédure de validation croisée.
 La figure ci-après montre la procédure de validation
 <p align="center">
-  <img src="degradation/schema_degradation.png" width="500" alt="Schéma de dégradation">
+  <img src="dégradation/schema_degradation.png" width="500" alt="Schéma de dégradation">
 </p>
 
 
