@@ -15,25 +15,19 @@ Cette partie....
 
 ### 1. Préparation des données sols
 
--   [11_soil_PFB_prep.R](11_soil_PFB_prep.R) - Connect to BIS 
--   [12_soil_BIS_master_tibble.R](12_soil_BIS_master_tibble.R) - Combine all BIS soil information 
+
 
 
 ### 2. Extraction des covariables
 
--   [20_cov_prep_gdal.R](20_cov_prep_gdal.R) - Assemble & prepare predictors (covariates as raster data):
-    -   Designate coordinate system (projection)
-    -   Resample covariates so they have the same origin, cell locations and extent
-    -   Mask nodata areas (water and areas outside NL) of continuous covariates
 
 ### 3. Calibration des modèles et cartographie <img src="carto/modeles_CSMS.png" align="right" width="500"/>
 
--   [30_regression_matrix_BIS.R](30_regression_matrix_BIS.R) - Read in prepared covariate stack and soil point data with coordinates; overlay rasters and points and prepare regression matrix (extract covariate values from sampled/observed locations)
+
 
 ### 4. Expérience de dégradation de l'information spatiale <img src="dégradation/schema_degradation.png" align="right" width="500"/>
 
--   [40_train_RF_hyperparameter_tuning.R](40_train_RF_hyperparameter_tuning.R) - Tune random forest (RF) hyperparameters:
-    -   Read in BIS regression matrix and select target (response) variable
+
     
 
 ### 5. Expérience de Geomasking
