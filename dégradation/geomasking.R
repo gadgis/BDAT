@@ -93,3 +93,29 @@ effectifs_agri
 
 # garder les points en zone agricole,
 res_in_agri <- res_sf[ext$in_agri, ]
+
+#  convertir en data.frame en récupérant les coordonnées de la géométrie
+coords <- sf::st_coordinates(res_in_agri)
+
+df_in_agri <- res_in_agri %>%
+  sf::st_drop_geometry() %>%
+  mutate(x_moved = coords[,1],   
+         y_moved = coords[,2])
+#Jointure au jeu de données initial
+df_joined <- data %>%
+  inner_join(
+    df_in_agri %>% dplyr::select(ID, d, x_moved, y_moved),
+    by = "ID"
+  )
+# Liste de data.frames, un par distance
+by_d <- split(df_joined, df_joined$d)
+
+# Sauvegarde des df par distance
+for (d in names(by_d)) {
+  saveRDS(
+    by_d[[d]],
+    file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/geomasked",name,"_dist", d, ".rds")
+  )
+}
+
+
