@@ -4,19 +4,19 @@
 # Institution : UMR Infos&Sols /GisSol/BDAT
 
 # Description : Script pour la cartographie des propriétés des sols en utilisant la méthode Random Forest 
-#               Krigeage ordinaire et Krigeage avec Dérive Externe 
+#               Krigeage ordinaire et Krigeage avec Dérive Externe avec un geomasking
 
 # Auteurs :     Mame Cheikh Gadiaga, Nicolas Saby
 
 # Contact :     gadiagacheikh1998@gmail.com | nicolas.saby@inrae.fr
 
-# Creation :    23-04-2025
+# Creation :    14-10-2025
 
-# Entrees :     Données ponctuelles de la BDAT et IGCS sur les propriétés des sols
+# Entrees :     Données ponctuelles de la BDAT et IGCS floutées sur les propriétés des sols
 
 # Sorties :     Carte des propriétés des sols sur la zone agricole
 
-# Modification : 06-10-2025
+# Modification : 
 #===========================================================================================================#
 
 #================================================DEBUT DU SCRIPT====================================================#
@@ -99,20 +99,17 @@ Myeval <- function(x, y){
 
 # 1. Définition des variables ------
 
-name="arg" # changer la variable d'intérêt au besoin 
+name="pH" # changer la variable d'intérêt au besoin 
 kmax= 23 # pour la parallelisation, le nb de coeurs
 ntree = 350 # le nbre d'arbre de random forest
 k=10 # pour la validation croisée
 nsim=100 # for bayesian inla simulation
-NomsCoord <- c("x","y")
+NomsCoord <- c("x_moved","y_moved")
+d<-100 # distance de geomasking
 
 #2.Preparation des données pour la spatialisation----
 ##2.1. Importation des données----
-datacov <- readRDS(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/donnees_ponctuelles", name, ".rds")) # jeu de données ponctuelles avec les covariables
-
-moyenne_covariable <- readRDS(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/moyenne_covariable", name, ".rds")) # jeu de données avec les moyennes des covariables par commune
-
-com <- st_read("Y:/BDAT/traitement_donnees/MameGadiaga/data/commune_53.shp") # shapefile des communes
+dtTB<-readRDS(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/geomasked",name,"_dist", d, ".rds")) # jeu de données ponctuelles avec les covariables
 
 rast_za <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rast_za.tif") # raster de la zone agricole
 
@@ -127,29 +124,22 @@ l<- list.files(chemin_cov, pattern = ".tif$", full.names = TRUE)
 
 #stack des covariables
 st <- rast(l)
-plot(st)
+
+datacov <- terra::extract(st, st_as_sf(dtTB, coords = NomsCoord, crs = 2154)) %>%
+  bind_cols(dtTB %>% 
+              dplyr::select(all_of(c(name, NomsCoord, "source", "INSEE_COM")))) %>%
+  mutate(id = row_number()) %>%
+  na.omit()
+
+datacov <- datacov %>%
+  mutate(INSEE_COM = as.character(INSEE_COM))
 
 
 # Préparer les covariables sous forme de tableau à partir du stack
 gXY <- as.data.frame(st , xy=TRUE) %>%
   na.omit( )
 
-centroides_communes <- st_centroid(com) %>% dplyr::select(INSEE_COM, X = X_CENTROID, Y = Y_CENTROID) %>% st_drop_geometry()
 
-#Enlever le commentaire et exécuter les lignes suivantes si vous vouler utilisiser l'approche centroides
-# Changer la variable d'intérêt au besoin
-
-# y_agg<-datacov %>%
-#   group_by(INSEE_COM) %>%
-#   summarise(arg = mean(arg, na.rm = TRUE)) %>%
-#   ungroup()
-# 
-# datacov<-moyenne_covariable %>%
-#   left_join(y_agg, by = "INSEE_COM") %>%
-#   left_join(centroides_communes, by = "INSEE_COM")%>%
-#   rename(x=X, y=Y)
-# 
-# 
 # datacov$id<- 1:nrow(datacov)
 
 fold = createFolds(y = datacov$id, k = k)
@@ -162,7 +152,7 @@ colnames(datacov)
 idcovs = 2:65
 idvar = 66
 
-source("carto/31_Calibration_RF.R")
+source("geomasking/52_Calibration_RF.R")
 
 resuXvalQRF
 
@@ -188,7 +178,7 @@ r <- rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "qrf
 
 dataINLA$qrf <-  terra::extract(  r , vect(dataINLA)  )$QRF_Median
 
-source("carto/32_Calibration_KO.R")
+source("geomasking/53_Calibration_KO.R")
 
 resuXvalTKO
 
@@ -196,61 +186,61 @@ resuXvalTKO
 # 5. Krigeage avec dérive externe -------------
 
 
-source("carto/33_Calibration_KED.R")
+source("geomasking/54_Calibration_KED.R")
 resuXvalpredINLAKED
 
-# 6. Cartographie des résultats-----
-
-# Reéchantillonnage des rasters 
-
-qrf =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"qrf.tif"))
-koINLA =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKOINLA.tif"))
-kedINLA =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKEDINLA.tif"))
-
-qrf = terra::resample(qrf,kedINLA)
-koINLA = terra::resample(koINLA,kedINLA)
-
-#Affection du même système de projection
-
-crs(rast_za) <- "EPSG:2154"
-crs(qrf) <- "EPSG:2154"
-crs(koINLA) <- "EPSG:2154"
-crs(kedINLA) <- "EPSG:2154"
-
-# Extension et masquage des rasters à la zone agricole
-qrf<- extend(qrf, rast_za, snap = "near")
-koINLA<- extend(koINLA, rast_za, snap = "near")
-kedINLA<- extend(kedINLA, rast_za, snap = "near")
-
-qrf_agri = mask(qrf, rast_za)
-koINLA_agri = mask(koINLA, rast_za)
-kedINLA_agri = mask(kedINLA, rast_za)
-
-# 10. Sauvegarde des rasters finaux-----
-
-writeRaster(qrf_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"qrf_final_cent.tif"), overwrite = TRUE)
-writeRaster(koINLA_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKOINLA_final_cent.tif"), overwrite = TRUE)
-writeRaster(kedINLA_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKEDINLA_final_cent.tif"), overwrite = TRUE)
-
-# 11. Visualisation des résultats-----
-predstack <- c(koINLA_agri,qrf_agri,kedINLA_agri)
-names(predstack) <- c("Krigeage Ordi. INLA","QRF","KED-INLA")
-plot(predstack)
-
-tm_shape(predstack) +
-  tm_raster(
-    col.scale = tm_scale(values = terrain.colors(10) ,
-                         style = "quantile",n = 10),
-    col.legend = 
-      tm_legend(
-        position = c(0,0.3),
-        item.height = .6,
-        item.width = .5,
-        item.r = 0, 
-        text.size = .3,
-        item.space = 0.05, 
-        item.na.space = .51, 
-        title.align = "Carbone")
-  )
+# # 6. Cartographie des résultats-----
+# 
+# # Reéchantillonnage des rasters 
+# 
+# qrf =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"qrf.tif"))
+# koINLA =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKOINLA.tif"))
+# kedINLA =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKEDINLA.tif"))
+# 
+# qrf = terra::resample(qrf,kedINLA)
+# koINLA = terra::resample(koINLA,kedINLA)
+# 
+# #Affection du même système de projection
+# 
+# crs(rast_za) <- "EPSG:2154"
+# crs(qrf) <- "EPSG:2154"
+# crs(koINLA) <- "EPSG:2154"
+# crs(kedINLA) <- "EPSG:2154"
+# 
+# # Extension et masquage des rasters à la zone agricole
+# qrf<- extend(qrf, rast_za, snap = "near")
+# koINLA<- extend(koINLA, rast_za, snap = "near")
+# kedINLA<- extend(kedINLA, rast_za, snap = "near")
+# 
+# qrf_agri = mask(qrf, rast_za)
+# koINLA_agri = mask(koINLA, rast_za)
+# kedINLA_agri = mask(kedINLA, rast_za)
+# 
+# # 10. Sauvegarde des rasters finaux-----
+# 
+# writeRaster(qrf_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"qrf_final_cent.tif"), overwrite = TRUE)
+# writeRaster(koINLA_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKOINLA_final_cent.tif"), overwrite = TRUE)
+# writeRaster(kedINLA_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKEDINLA_final_cent.tif"), overwrite = TRUE)
+# 
+# # 11. Visualisation des résultats-----
+# predstack <- c(koINLA_agri,qrf_agri,kedINLA_agri)
+# names(predstack) <- c("Krigeage Ordi. INLA","QRF","KED-INLA")
+# plot(predstack)
+# 
+# tm_shape(predstack) +
+#   tm_raster(
+#     col.scale = tm_scale(values = terrain.colors(10) ,
+#                          style = "quantile",n = 10),
+#     col.legend = 
+#       tm_legend(
+#         position = c(0,0.3),
+#         item.height = .6,
+#         item.width = .5,
+#         item.r = 0, 
+#         text.size = .3,
+#         item.space = 0.05, 
+#         item.na.space = .51, 
+#         title.align = "Carbone")
+#   )
 
 #================================================FIN DU SCRIPT====================================================#
