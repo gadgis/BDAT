@@ -56,7 +56,7 @@ classement_brt_approche = attStats(result_brt_approche) %>%
 
 # sauvegarde des covariables sélectionnées
 
-saveRDS(cov_brt, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "_cov_brt.rds"))
+saveRDS(cov_brt, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "_cov_brt_geomask",d,".rds"))
 
 #3. Création du jeu de données d'entrée pour la calibration du modèle----
 
@@ -107,7 +107,7 @@ Imp_RF <- Imp_RF %>%
 
 # sauvegarde de l'odre d'importance des covariables
 
-saveRDS(Imp_RF, file=paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"_Imp_RF.rds"))
+saveRDS(Imp_RF, file=paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"_Imp_RF_geomask",d,".rds"))
 
 Imp_RF <- Imp_RF %>%
   rename(importance = RF_Mod.G.variable.importance)
@@ -175,7 +175,7 @@ QRF_Median50 <- bind_cols(gXY %>%
 r <- rast(QRF_Median50, type="xyz")
 
 
-terra::writeRaster(r, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "qrf.tif"), overwrite = TRUE)
+terra::writeRaster(r, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "qrf_geomask",d,".tif"), overwrite = TRUE)
 
 
 #9. Evaluation du modèle par validation croisée-----

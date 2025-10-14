@@ -73,7 +73,7 @@ print(p)
 
 terra::writeRaster(
   rast(pred)[["mean"]],
-  file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "predKEDINLA.tif"),
+  file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "predKEDINLA_geomask",d,".tif"),
   overwrite = TRUE
 )
 

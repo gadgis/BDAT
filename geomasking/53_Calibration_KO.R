@@ -121,7 +121,7 @@ print(p)
 
 terra::writeRaster(
   rast(predKO)[["mean"]],
-  file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "predKOINLA.tif"),
+  file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "predKOINLA_geomask",d,".tif"),
   overwrite = TRUE
 )
 

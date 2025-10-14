@@ -173,7 +173,7 @@ proj4string(dataINLA) <-  "epsg:2154"
 
 ## 4.2. Création d'un tableau avec les prédictions random forest----
 
-r <- rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "qrf.tif"))
+r <- rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "qrf_geomask",d,".tif"))
 
 
 dataINLA$qrf <-  terra::extract(  r , vect(dataINLA)  )$QRF_Median
