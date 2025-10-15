@@ -54,10 +54,13 @@ name <- "arg"
 
 # Fonction pour transformer un raster en data.frame utilisable par ggplot2
 
-raster_to_df <- function(r, modele, type_approche) {
-  as.data.frame(r, xy = TRUE, na.rm = FALSE) %>%
-    rename(arg = 3) %>% # adapter selon la propriété cible
-    mutate(modèle = modele, type = type_approche)
+raster_to_df <- function(r, modele, type_approche, prop_name = "val") {
+  df <- as.data.frame(r, xy = TRUE, na.rm = FALSE)
+  val_col <- colnames(df)[3]
+  df <- df %>%
+    dplyr::rename(!!prop_name := all_of(val_col)) %>%
+    dplyr::mutate(modèle = modele, type = type_approche)
+  return(df)
 }
 
 
@@ -213,13 +216,13 @@ ko_ponc  <- rast(paste0(name,"predKOINLA_final.tif"))
 rf_ponc  <- rast(paste0(name,"qrf_final.tif"))
 
 # Appliquer la fonction pour créer les data.frames
-df_ked_cent <- raster_to_df(ked_cent, "KED", "Désagrégation")
-df_ko_cent  <- raster_to_df(ko_cent,  "KO",  "Désagrégation")
-df_rf_cent  <- raster_to_df(rf_cent,  "RF",  "Désagrégation")
+df_ked_cent <- raster_to_df(ked_cent, "KED", "Désagrégation",     prop_name = "val")
+df_ko_cent  <- raster_to_df(ko_cent,  "KO",  "Désagrégation",     prop_name = "val")
+df_rf_cent  <- raster_to_df(rf_cent,  "RF",  "Désagrégation",     prop_name = "val")
 
-df_ked_ponc <- raster_to_df(ked_ponc, "KED", "Données ponctuelles")
-df_ko_ponc  <- raster_to_df(ko_ponc,  "KO",  "Données ponctuelles")
-df_rf_ponc  <- raster_to_df(rf_ponc,  "RF",  "Données ponctuelles")
+df_ked_ponc <- raster_to_df(ked_ponc, "KED", "Données ponctuelles", prop_name = "val")
+df_ko_ponc  <- raster_to_df(ko_ponc,  "KO",  "Données ponctuelles", prop_name = "val")
+df_rf_ponc  <- raster_to_df(rf_ponc,  "RF",  "Données ponctuelles", prop_name = "val")
 
 
 #3. Cartographie de la propriété pour chaque modèle selon les approches----
@@ -258,7 +261,7 @@ valeurs_coupures <- c(0, 50, 100, 150, 200, 400, 600)
 # cration du graphique
 p_arg <- plot_raster_facets(
   df_all,
-  fill_col    = arg,
+  fill_col    = val,
   palette_cont = couleurs_argile,
   cuts         = valeurs_coupures,
   limits_cont  = c(100, 600),
@@ -270,7 +273,7 @@ p_arg <- plot_raster_facets(
 
 # Catégorisation par classe de pH
 df_all <- df_all %>%
-  mutate(classe_ph = cut(pH,
+  mutate(classe_ph = cut(val,
                          breaks = c(3, 4, 5, 6, 6.5, 7, 8, 9, 10),
                          labels = c("[3 – 4[", "[4 – 5[", "[5 – 6[", "[6 – 6.5[", "[6.5 – 7[", "[7 – 8[", "[8 – 9[", "[9 – 10]"),
                          include.lowest = TRUE))
@@ -292,7 +295,7 @@ p_ph <- plot_raster_facets(
   df_all,
   fill_col   = classe_ph,
   palette_disc = couleurs_ph,
-  fill_label   = "pH"
+  fill_label   = "pH (classes)"
 )
 
 
@@ -312,11 +315,16 @@ print(p_arg)
 
 
 ## 4.2. pH----
+df_ked_ponc <- df_ked_ponc %>%
+  mutate(classe_ph = cut(val,
+                         breaks = c(3, 4, 5, 6, 6.5, 7, 8, 9, 10),
+                         labels = c("[3 – 4[", "[4 – 5[", "[5 – 6[", "[6 – 6.5[", "[6.5 – 7[", "[7 – 8[", "[8 – 9[", "[9 – 10]"),
+                         include.lowest = TRUE))
 p_ph <- plot_raster_indiv(
   df       = df_ked_ponc,# A adapter ici c'est le KED en approche ponctuelle
   fill_col = classe_ph,
   palette_disc = couleurs_ph,
-  fill_label   = "pH"
+  fill_label   =  "pH (classes)"
 )
 print(p_ph)
 
