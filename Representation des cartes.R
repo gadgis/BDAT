@@ -47,7 +47,7 @@ library(rlang)
 # 1. Dossier de travail paramètres et fonctions----
 
 setwd("Y:/BDAT/traitement_donnees/MameGadiaga/resultats")
-name <- "arg"
+name <- "pH"
 
 #  utilitaire de calcul
 `%||%` <- function(a, b) if (!is.null(a)) a else b
@@ -70,8 +70,8 @@ raster_to_df <- function(r, modele, type_approche, prop_name = "val") {
 plot_raster_facets <- function(
     df,
     fill_col,                     # la colonne à cartographier 
-    type_col   = type,            # colonne des lignes de facet 
-    model_col  = modèle,          # colonne des colonnes de facet
+    type_col   = "type",            # colonne des lignes de facet 
+    model_col  = "modèle",          # colonne des colonnes de facet
     # paramètres pour continu
     palette_cont   = NULL,        # couleurs_argile
     cuts           = NULL,        # valeurs_coupures (pour values = rescale(cuts))
@@ -303,25 +303,25 @@ p_ph <- plot_raster_facets(
 
 ## 4.1. Argile----
 
-p_arg <- plot_raster_indiv(
+p_arg_indiv <- plot_raster_indiv(
   df      = df_ked_ponc,# A adapter ici c'est le KED en approche ponctuelle 
-  fill_col = arg,
+  fill_col = val,
   palette_cont = couleurs_argile,
   cuts        = valeurs_coupures,
   limits_cont = c(100, 600),
   fill_label  = "Argile (g/kg)"
 )
-print(p_arg)
+print(p_arg_indiv)
 
 
 ## 4.2. pH----
-df_ked_ponc <- df_ked_ponc %>%
+df_ked_ponc_ph  <- df_ked_ponc %>%
   mutate(classe_ph = cut(val,
                          breaks = c(3, 4, 5, 6, 6.5, 7, 8, 9, 10),
                          labels = c("[3 – 4[", "[4 – 5[", "[5 – 6[", "[6 – 6.5[", "[6.5 – 7[", "[7 – 8[", "[8 – 9[", "[9 – 10]"),
                          include.lowest = TRUE))
-p_ph <- plot_raster_indiv(
-  df       = df_ked_ponc,# A adapter ici c'est le KED en approche ponctuelle
+p_ph_indiv <- plot_raster_indiv(
+  df       = df_ked_ponc_ph,# A adapter ici c'est le KED en approche ponctuelle
   fill_col = classe_ph,
   palette_disc = couleurs_ph,
   fill_label   =  "pH (classes)"
