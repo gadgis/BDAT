@@ -221,6 +221,7 @@ df_ko_cent  <- raster_to_df(ko_cent,  "KO",  "Désagrégation",     prop_name = 
 df_rf_cent  <- raster_to_df(rf_cent,  "RF",  "Désagrégation",     prop_name = "val")
 
 df_ked_ponc <- raster_to_df(ked_ponc, "KED", "Données ponctuelles", prop_name = "val")
+
 df_ko_ponc  <- raster_to_df(ko_ponc,  "KO",  "Données ponctuelles", prop_name = "val")
 df_rf_ponc  <- raster_to_df(rf_ponc,  "RF",  "Données ponctuelles", prop_name = "val")
 
@@ -271,31 +272,24 @@ p_arg <- plot_raster_facets(
 
 ## 3.2. Pour le pH----
 
-# Catégorisation par classe de pH
-df_all <- df_all %>%
-  mutate(classe_ph = cut(val,
-                         breaks = c(3, 4, 5, 6, 6.5, 7, 8, 9, 10),
-                         labels = c("[3 – 4[", "[4 – 5[", "[5 – 6[", "[6 – 6.5[", "[6.5 – 7[", "[7 – 8[", "[8 – 9[", "[9 – 10]"),
-                         include.lowest = TRUE))
 
-# Palette couleur
-couleurs_ph <- c(
-  "[3 – 4[" = "#ca0020",
-  "[4 – 5[" = "#f46d43",
-  "[5 – 6[" = "#fdae61",
-  "[6 – 6.5[" = "#fee08b",
-  "[6.5 – 7[" = "#d9ef8b",
-  "[7 – 8[" = "#a6d96a",
-  "[8 – 9[" = "#66bd63",
-  "[9 – 10]" = "#1a9850"
+ph_limits <- as.numeric(quantile(df_all$val, probs = c(0.01, 0.99), na.rm = TRUE))
+
+# Palette divergeante simple (autour de ~ neutre)
+palette_ph <- c(
+  "#ca0020",  
+  "#f46d43",
+  "#fee08b",  
+  "#a6d96a",
+  "#1a9850"   
 )
 
-# Création du graphique
 p_ph <- plot_raster_facets(
-  df_all,
-  fill_col   = classe_ph,
-  palette_disc = couleurs_ph,
-  fill_label   = "pH (classes)"
+  df           = df_all,
+  fill_col     = val,
+  palette_cont = palette_ph,
+  limits_cont  = ph_limits,
+  fill_label   = "pH (H₂O)"
 )
 
 
@@ -315,18 +309,17 @@ print(p_arg_indiv)
 
 
 ## 4.2. pH----
-df_ked_ponc_ph  <- df_ked_ponc %>%
-  mutate(classe_ph = cut(val,
-                         breaks = c(3, 4, 5, 6, 6.5, 7, 8, 9, 10),
-                         labels = c("[3 – 4[", "[4 – 5[", "[5 – 6[", "[6 – 6.5[", "[6.5 – 7[", "[7 – 8[", "[8 – 9[", "[9 – 10]"),
-                         include.lowest = TRUE))
+ph_limits_indiv <- as.numeric(quantile(df_ked_ponc$val, probs = c(0.01, 0.99), na.rm = TRUE))
+
 p_ph_indiv <- plot_raster_indiv(
-  df       = df_ked_ponc_ph,# A adapter ici c'est le KED en approche ponctuelle
-  fill_col = classe_ph,
-  palette_disc = couleurs_ph,
-  fill_label   =  "pH (classes)"
+  df           = df_ked_ponc,   
+  fill_col     = val,
+  palette_cont = palette_ph,
+  limits_cont  = ph_limits_indiv,
+  fill_label   = "pH"
 )
-print(p_ph)
+
+print(p_ph_indiv)
 
 #============================================FIN DU SCRIPT=================================================================#
 
