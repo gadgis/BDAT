@@ -1,5 +1,5 @@
 #===========================================================================================================#
-# Script : Script principal 
+# Script : Script principal geomasking
 
 # Institution : UMR Infos&Sols /GisSol/BDAT
 
@@ -189,58 +189,58 @@ resuXvalTKO
 source("geomasking/54_Calibration_KED.R")
 resuXvalpredINLAKED
 
-# # 6. Cartographie des résultats-----
-# 
-# # Reéchantillonnage des rasters 
-# 
-# qrf =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"qrf.tif"))
-# koINLA =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKOINLA.tif"))
-# kedINLA =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKEDINLA.tif"))
-# 
-# qrf = terra::resample(qrf,kedINLA)
-# koINLA = terra::resample(koINLA,kedINLA)
-# 
-# #Affection du même système de projection
-# 
-# crs(rast_za) <- "EPSG:2154"
-# crs(qrf) <- "EPSG:2154"
-# crs(koINLA) <- "EPSG:2154"
-# crs(kedINLA) <- "EPSG:2154"
-# 
-# # Extension et masquage des rasters à la zone agricole
-# qrf<- extend(qrf, rast_za, snap = "near")
-# koINLA<- extend(koINLA, rast_za, snap = "near")
-# kedINLA<- extend(kedINLA, rast_za, snap = "near")
-# 
-# qrf_agri = mask(qrf, rast_za)
-# koINLA_agri = mask(koINLA, rast_za)
-# kedINLA_agri = mask(kedINLA, rast_za)
-# 
-# # 10. Sauvegarde des rasters finaux-----
-# 
-# writeRaster(qrf_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"qrf_final_cent.tif"), overwrite = TRUE)
-# writeRaster(koINLA_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKOINLA_final_cent.tif"), overwrite = TRUE)
-# writeRaster(kedINLA_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKEDINLA_final_cent.tif"), overwrite = TRUE)
-# 
-# # 11. Visualisation des résultats-----
-# predstack <- c(koINLA_agri,qrf_agri,kedINLA_agri)
-# names(predstack) <- c("Krigeage Ordi. INLA","QRF","KED-INLA")
-# plot(predstack)
-# 
-# tm_shape(predstack) +
-#   tm_raster(
-#     col.scale = tm_scale(values = terrain.colors(10) ,
-#                          style = "quantile",n = 10),
-#     col.legend = 
-#       tm_legend(
-#         position = c(0,0.3),
-#         item.height = .6,
-#         item.width = .5,
-#         item.r = 0, 
-#         text.size = .3,
-#         item.space = 0.05, 
-#         item.na.space = .51, 
-#         title.align = "Carbone")
-#   )
+# 6. Cartographie des résultats-----
+
+# Reéchantillonnage des rasters
+
+qrf =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "qrf_geomask",d,".tif"))
+koINLA =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKOINLA_geomask",d,".tif"))
+kedINLA =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKEDINLA_geomask",d,".tif"))
+
+qrf = terra::resample(qrf,kedINLA)
+koINLA = terra::resample(koINLA,kedINLA)
+
+#Affection du même système de projection
+
+crs(rast_za) <- "EPSG:2154"
+crs(qrf) <- "EPSG:2154"
+crs(koINLA) <- "EPSG:2154"
+crs(kedINLA) <- "EPSG:2154"
+
+# Extension et masquage des rasters à la zone agricole
+qrf<- extend(qrf, rast_za, snap = "near")
+koINLA<- extend(koINLA, rast_za, snap = "near")
+kedINLA<- extend(kedINLA, rast_za, snap = "near")
+
+qrf_agri = mask(qrf, rast_za)
+koINLA_agri = mask(koINLA, rast_za)
+kedINLA_agri = mask(kedINLA, rast_za)
+
+# 10. Sauvegarde des rasters finaux-----
+
+writeRaster(qrf_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"qrf_final_geomask",d,".tif"), overwrite = TRUE)
+writeRaster(koINLA_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKOINLA_final_geomask",d,".tif"), overwrite = TRUE)
+writeRaster(kedINLA_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKEDINLA_final_geomask",d,".tif"), overwrite = TRUE)
+
+# 11. Visualisation des résultats-----
+predstack <- c(koINLA_agri,qrf_agri,kedINLA_agri)
+names(predstack) <- c("Krigeage Ordi. INLA","QRF","KED-INLA")
+plot(predstack)
+
+tm_shape(predstack) +
+  tm_raster(
+    col.scale = tm_scale(values = terrain.colors(10) ,
+                         style = "quantile",n = 10),
+    col.legend =
+      tm_legend(
+        position = c(0,0.3),
+        item.height = .6,
+        item.width = .5,
+        item.r = 0,
+        text.size = .3,
+        item.space = 0.05,
+        item.na.space = .51,
+        title.align = "Carbone")
+  )
 
 #================================================FIN DU SCRIPT====================================================#

@@ -71,13 +71,13 @@ res_sf <- st_as_sf(
 # Extraction des valeurs du raster à chaque point
 ext <- terra::extract(zone_agri, terra::vect(res_sf), bind = TRUE)
 
-# nom de la colonne raster (souvent "layer" ou le nom du fichier)
+# nom de la colonne raster 
 val_col <- names(zone_agri)[1]
 
-# 3) Marque "en zone agricole"
+#  Marque "en zone agricole"
 ext$in_agri <- !is.na(ext[[val_col]]) & ext[[val_col]] == 1  # marche si hors-zone = NA ou 0
 
-# 4) Résumé par distance d
+# Résumé par distance d
 effectifs_agri <- ext |>
   as.data.frame() |>
   group_by(d) |>
