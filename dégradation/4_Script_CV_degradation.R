@@ -1,26 +1,51 @@
-# Script principal pour faire de la validation croisée en intégrant la dégradation 
+#=============================================================================================================================#
+# Script :      Script principale pour la validation croisée intégrant un processus de dégradation de l'information ponctuelle
 
-#L'idée est de partir des données ponctuelles (contenant les covaribles et les valeurs de la propriété cible).
-#Suivant les différentes voies de validation croisée (classique ou spatiale), on définit des folds et à chaque itérartion,
-#on calivre sur les k-1 folds et on teste sur le fold restant. Mais la calibration ne se fait pas sur l'intégralité des points
-#des k-1 folds mais plutut sur un échantillon ce qui permet de simuler la dégradation de l'information.
+# Institution : UMR Infos&Sols /GisSol/BDAT
 
-#Pour chaque échantillon on implémente d'abord le Random Forest pour avoir les prédictions, les metriques, les identifiant' numéro folds,
-#id, numéro repetition) pour ensuite les utiliser et eviter la perte d'information afin d'implémenter le KO et le KED.
+# Description : La validation croisée est une technique utilisée pour évaluer la performance prédictive d'un modèle en le 
+#               testant sur des sous-ensembles de données . Elle pemet d'évaluer la capacité de généralisation du modèle.
+#               Pour effectuer la validation croisée, il est nécessaire de diviser le jeu de données en k groupes. k itérations sont 
+#               effectuées où à chaque itération un groupe est utilisé comme jeu de test et les k-1 autres groupes comme jeu de calibration.
+#               Cette séparation des données en groupes peut se faire de façon classique comme spatiale
+#               La forme classique consiste à diviser aléatoirement le jeu de données en k groupes alors que celle 
+#               spatiale divise les données en k groupes en fonction des communes donc les points utilisés pour la calibration appartiennent au 
+#               même groupe de communes.
+#               Dans un soucis d'évaluer l’influence de la densité d’échantillonnage sur la qualité des prédictions et la sensibilité 
+#               des modèles utilisées face à une diminution de la densité d’échantillonnage du jeu de calibration, la dégradation est intégrée 
+#               dans le processus de validation croisée. L'idée est de  réduire la taille de l'échantillon
+#               utilisé pour la calibration du modèle. Ainsi à chaque itération un échantillon du pool de calibration (k-1 groupes) est prélevé
+#               aléatoirement pour calibrer le modèle. Ce processus est repeté 30 fois pour chaque taille d'échantillon et pour chaque forme 
+#               de validation croisée (classique et spatiale).
+
+
+# Auteurs :     Mame Cheikh Gadiaga, Nicolas Saby
+
+# Contact :     gadiagacheikh1998@gmail.com | nicolas.saby@inrae.fr
+
+# Creation :    21-07-2025
+
+# Entrees :     Jeu de données sur les propriétés des sols, scripts utilitaireS pour le RF, KO et KED
+
+# Sorties :     Tableu avec les valeurs des indicateurs de performance pour chaque modèle et selon la taille d'échantillon la forme de la CV 
+#               et l4approche de CSMS
+
+# Modification : 08-10-2025
+#===========================================================================================================================#
+
+#================================================DEBUT DU SCRIPT============================================================#
+
+
 
 #1. Chargement des packages----
 
 library(sf)
-# library(tmap)
 library(readxl)
 library(tidyr)
 library(dplyr)
 library(foreach)
-library(raster) # pourquoi Raster????
+library(raster) 
 library(purrr)
-# library(ggpubr)
-# library(ggnewscale)
-# library(doParallel)
 library(tuneRanger)
 library(INLA)
 library(inlabru)
@@ -30,13 +55,14 @@ library(caret)
 
 # setwd("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R")
 
-#2. Chargement des fonctions RF, INLA  Myeval et dataINLA----
+#2. Fonctions RF, INLA, geomasking,  Myeval----
 
-source("dégradation/fonction_RF.R")
+source("dégradation/41_fonction_RF.R")
 
-source("dégradation/fonction_inla.R")
+source("dégradation/42_fonction_KO_KED.R")
+
 source("dégradation/fonction_geomasking.R")
-#Myeval
+
 Myeval <- function(x, y){
   ME <- mean(y - x, na.rm = TRUE)
   RMSE <- sqrt(mean((y - x)^2, na.rm = TRUE))
@@ -57,46 +83,55 @@ Myeval <- function(x, y){
 }
 
 
-# dataINLA
-
-# Paramètres
+#3. Definir les paramètres----
 
 #!/usr/bin/env Rscript
 args = commandArgs(trailingOnly=TRUE)
 
-name <- args[1]  #arg
-sample_sizes <- args[2] # c(500,1000 ) # c(600,800,1000,1200,1300,1400,1600,1800,2000,3000,4000,5000,6000,7000,7600)
-repets <- args[3]
+name <- args[1]  #nom de la variable cible (ex. "arg" ou "pH")
 
+sample_sizes <- args[2] #tailles d'échantillon de calibration pour la dégradation
 
+repets <- args[3] #nombre de répétitions par taille d’échantillon (entier)
 
-kmax <- 30
-ntree <- 350
-NomsCoord <- c("x", "y")
-types_validation <- c("Classique", "Spatiale")
-drive = "/media/communs_infosol/" # ou "Y:/"
+kmax <- 30 #nombre de coeurs pour la parallelisation
+
+ntree <- 350  #nombre d'arbres pour la RF
+
+NomsCoord <- c("x", "y") #noms des colonnes des coordonnées
+
+types_validation <- c("Classique", "Spatiale") #types de validation croisée
+
+drive <- "/media/communs_infosol/" # ou "Y:/" #chemin d'accès aux données
+
 DistanceGeomasking = 0
 
-#3. Chargement des données---- 
+
+#4. Chargement des données---- 
+
 
 com <- st_read( paste0(drive, "BDAT/traitement_donnees/MameGadiaga/data/commune_53.shp") )
-centroides_communes <- st_centroid(com) %>% dplyr::select(INSEE_COM, X = X_CENTROID, Y = Y_CENTROID) %>% st_drop_geometry()
 
 datacov <- readRDS(paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/donnees_ponctuelles", name, ".rds"))
+
 moyenne_covariable <- readRDS(paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/moyenne_covariable", name, ".rds"))
 
 cov_brt <- readRDS(paste0(drive, "BDAT/traitement_donnees/MameGadiaga/resultats/", name, "_cov_brt.rds"))
 
-#4. loop of the ----
+centroides_communes <- st_centroid(com) %>% dplyr::select(INSEE_COM, X = X_CENTROID, Y = Y_CENTROID) %>% st_drop_geometry()
+
+
+
+#5. Boucle de la dégradation dans le processus de validation croisée ----
 
 
 cat("\n==============  Starting loops ===============\n")
 
 bru_safe_inla(multicore = FALSE)
 
-results_rf_all <- list()
+results_rf_all <- list()  #liste qui va accumuler les data.frames de résultats.
 
-resLoop <- foreach(
+resLoop <- foreach( # Boucle de la dégradation sur les tailles d'échantillon n
   
   n = sample_sizes,
   .combine = rbind.data.frame ,
@@ -109,30 +144,39 @@ resLoop <- foreach(
     cat("\n============== Taille d'échantillon :", n, "===============\n")
     
     k <- 10 #  ceiling(nrow(datacov) / 1000)
-    foreach (
+    
+    foreach (# Boucle sur les répétitions pour chaque taille d'échantillon n
       
       rep = 1:repets,
       .combine = rbind.data.frame,
-      
       .errorhandling='pass'
       
              ) %do%  {
+               
       cat("\n---- Répétition :", rep, "----\n")
       
       set.seed(1001 + rep)
       
-      foreach (type_val = types_validation,
+      foreach (# Boucle sur les types de validation croisée
+        
+        type_val = types_validation,
                .combine = rbind.data.frame,
                .errorhandling='pass'
+        
                ) %do% {
+                 
         cat(">> Validation :", type_val, "\n")
         
+        # Création des groupes ou folds en fonction du type de validation croisée
+                 
         folds <- if (type_val == "Classique") {
           createFolds(datacov[[name]], k = k, list = TRUE)
         } else {
           communes <- unique(datacov$INSEE_COM)
           split(communes, sample(rep(1:k, length.out = length(communes))))
         }
+        
+        # Boucle sur les folds
         
       foreach (fold_idx = 1:k,
                  .combine = rbind.data.frame,
@@ -154,6 +198,7 @@ resLoop <- foreach(
             calib_pool <- datacov[idx_calib, ]
           }
           
+           # Echantillonnage du jeu de calibration à partir du pole de calibration (k-1 groupes)  
                    
           NCalibTotal <- nrow(calib_pool)
           
@@ -175,83 +220,105 @@ resLoop <- foreach(
             
           cat("-----taille du groupe resample de la kfold  ",nrow(calib_points)," >>>>>")
           
-          # if ( !is.na(geomasking) ) {
-          #   calib_points_geomasked <- geomasking(calib_points,geomasking)
-          #}
-
           
+          # Application des modèles RF, KO et KED selon l'appoche de CSMS (Données ponctuelles vs Désagrégation)
+    
           # RF Ponctuelle
-          res_rf_p <- run_rf(
-            "Ponctuelle",
-            type_val,
-            calib_points,
-            test_data,
-            cov_brt,
-            moyenne_covariable,
-            name,
-            ntree,
-            kmax,
-            NomsCoord
-          )
           
-          calib_points$pred  <- res_rf_p$predCal
+          cat("=> Exécution RF ; Approche : Données Ponctuelle ", type_val, "\n")
           
+            ## Appel de la fonction RF
           
-          # agrgégation de la variable cible pour la méthode Centroide
+                res_rf_p <- run_rf(
+                "Ponctuelle",
+                type_val,
+                calib_points,
+                test_data,
+                cov_brt,
+                moyenne_covariable,
+                name,
+                ntree,
+                kmax,
+                NomsCoord)
+                       
           
-          agg_target <- calib_points %>%
-            dplyr::select(INSEE_COM, all_of(name)) %>%
-            group_by(INSEE_COM) %>%
-            dplyr::summarise(!!name := mean(.data[[name]], na.rm = TRUE),
+            ## Ajout des prédictions RF aux jeux de calibration pour KED
+          
+            calib_points$pred  <- res_rf_p$predCal
+          
+          # RF Désagrégation
+          
+          ## Agrgégation de la variable cible paà l'échelle communale
+          
+            agg_target <- calib_points %>%
+              dplyr::select(INSEE_COM, all_of(name)) %>%
+              group_by(INSEE_COM) %>%
+              dplyr::summarise(!!name := mean(.data[[name]], na.rm = TRUE),
                       .groups = "drop")
           
-          train_aggr <- moyenne_covariable %>%
-            inner_join(agg_target, 
-                       by = "INSEE_COM"
-                       )
+              train_aggr <- moyenne_covariable %>%
+                            inner_join(agg_target, 
+                             by = "INSEE_COM" )
           
-          res_rf_c <- run_rf(
-            "Centroide",
-            type_val,
-            train_aggr,
-            test_data,
-            cov_brt,
-            moyenne_covariable,
-            name,
-            ntree,
-            kmax,
-            NomsCoord
-          )
+          cat("=> Exécution RF ; Approche : Désagrégation" , type_val, "\n")
           
+          ## Appel de la fonction RF
           
+            res_rf_c <- run_rf(
+              "Désagrégation",
+              type_val,
+              train_aggr,
+              test_data,
+              cov_brt,
+              moyenne_covariable,
+              name,
+              ntree,
+              kmax,
+              NomsCoord )
+          
+          ## Ajout des prédictions RF aux jeux de calibration pour KED
+            
           train_aggr$pred = res_rf_c$predCal
           
           
+          # KO Ponctuelle
           
-          cat("=> Exécution INLA ", type_val, "\n")
+          cat("=> Exécution KO ; Approche : Données ponctuelles ", type_val, "\n")
           
-          res_ko_p <- run_inla_spde_core(calib_points,
+            ## Appel de la fonction INLA SPDE
+              res_ko_p <- run_inla_spde_core(calib_points,
                                          test_data,
                                          name,
                                          "KO",
                                          "Ponctuelle",
                                          type_val)
           
-          
+              
+           #KO Désagrégation
+              
+            ## Aggrégation de la variable cible à l'échelle communale
+              
           train_aggr <- train_aggr  %>%
             inner_join(centroides_communes, by = "INSEE_COM") %>%
             dplyr::rename(x = X, y = Y) %>%
             mutate(id = INSEE_COM)
           
+            ## Appel de la fonction INLA SPDE
+          
+          cat("=> Exécution KO ; Approche : Désagrégation ", type_val, "\n")
           
           res_ko_c <- run_inla_spde_core(as.data.frame(train_aggr),
                                          test_data,
                                          name,
                                          "KO",
-                                         "Centroide",
+                                         "Désagrégation",
                                          type_val)
           
+          # KED Ponctuelle
           
+          cat("=> Exécution KED ; Approche : Données ponctuelles ", type_val, "\n")
+          
+          ## Appel de la fonction INLA SPDE
           res_ked_p <- run_inla_spde_core(calib_points,
                                           res_rf_p$detail,
                                           name,
@@ -261,19 +328,32 @@ resLoop <- foreach(
           
           gc()
           
+          # KED Désagrégation
+          
+          cat("=> Exécution KED ; Approche : Désagrégation ", type_val, "\n")
+          
+          ## Appel de la fonction INLA SPDE
           res_ked_c <- run_inla_spde_core(as.data.frame(train_aggr),
                                           res_rf_c$detail ,
                                           
                                           name,
                                           "KED",
-                                          "Centroide",
+                                          "Désagrégation",
                                           type_val)
           
           gc()
           
           
           
-          # Stockage des prédictions RF
+          # Stockage des prédictions
+          
+          
+# Le bloc suivant construit un data.frame en empilant les deux approches : Ponctuelle et Désagrégation.
+# Ajoute les métadonnées (type_val, sample_size, rep, fold), renomme la cible en 'obs',
+# puis ne conserve que : id, approach, type_val, sample_size, rep, fold, obs, pred, predKO, predKED.
+# Le tableau obtenu est ajouté à la liste 'results_rf_all' (un élément par fold)          
+          
+          
       results_rf_all[[length(results_rf_all) + 1]] <- bind_rows(
             res_rf_p$detail %>% 
               mutate(approach = "Ponctuelle", 
@@ -289,7 +369,7 @@ resLoop <- foreach(
                             sample_size,rep,fold,
                             obs,pred ,predKO,predKED),
             res_rf_c$detail %>% 
-              mutate(approach = "Centroide",
+              mutate(approach = "Désagrégation",
                      type_val = type_val, 
                      sample_size = n,
                      rep = rep,
@@ -319,7 +399,7 @@ cat("FIN DES CALCULS--------------------")
 
 pred_RF_full <- bind_rows(results_rf_all)
 
-# 5. Save file -------------------- 
+# 6. Sauvegarde des fichiers-----
 
 if(drive == "Y:/") {
   Myfile = paste0(drive, 
@@ -349,9 +429,6 @@ if(drive == "Y:/") {
     
   }
   
-
-
-                       
 
 saveRDS(pred_RF_full, 
         Myfile)

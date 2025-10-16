@@ -1,66 +1,50 @@
-<<<<<<<< HEAD:codeRK/KO_INLASPDE.R
-# INLA -------------
+#===================================================================================================================#
+# Script :      Krigeage Ordinaire avec INLA SPDE
 
-========
-library(INLA)
-library(inlabru)
+# Institution : UMR Infos&Sols /GisSol/BDAT
 
+# Description : Script pour la prédiction des propriétés des sols en utilisant 
+#               la méthode Krigeage Ordinaire avec INLA SPDE 
 
-# INLA -------------
+# Auteurs :     Mame Cheikh Gadiaga, Nicolas Saby
+
+# Contact :     gadiagacheikh1998@gmail.com | nicolas.saby@inrae.fr
+
+# Creation :    23-04-2025
+
+# Entrees :     Observations ponctuelles avec la localisation (x,y) sous forme sp
+
+# Sorties :     Distribution a posteriori des paramètres du modèles, valeurs de la propriété cible sur la grille
+#               de prédictions et les indicateurs de performance
+
+# Modification : 06-10-2025
+#===================================================================================================================#
+
+#================================================DEBUT DU SCRIPT====================================================#
+
+# il faut récupérer une licence sur Pardiso : inla.pardiso()
 #inla.setOption(pardiso.license ="82F70E96BE7DA6A5956D4DF8F31E127ACCB33C981DE83F430BA469A2")
->>>>>>>> nsa-sauv-fin-stage:carto/KO_INLASPDE.R
+
 inla.setOption(
   num.threads = 15 ,
   inla.mode="experimental"
 )
-# il faut récupérer une licence sur Pardiso : inla.pardiso()
-# inla.setOption(pardiso.license ="82F70E96BE7DA6A5956D4DF8F31E127ACCB33C981DE83F430BA469A2")
 
+# 1.Définir de la grille de prédictions-----
 
-
-
-
-# Grille de prédictions
-# transformation en sp depuis terra
-pxl <- as.data.frame(parcR,xy=T)
+pxl <- as.data.frame(r,xy=T)
 colnames(pxl)[3] <- "qrf"
 gridded(pxl) <- ~x+y
 
 
+# 2. Préparation du mesh (maillage) pour la discrétisation du champ spatial----
+
+max.edge = diff(range(coords[,1]))/(3*5) # taille des triangles au cœur du maillage
+
+bound.outer = diff(range(coords[,1]) ) / 3 # marge externe où les triangles deviennent plus grands
 
 
-# Préparation du mesh pour la méthode INLA pour la discrétisation
-
-
-# max.edge = diff(range(coords[,1]))/(3*5)
-# bound.outer = diff(range(range(coords[,1])))/3
-# 
-# bndint <- inla.nonconvex.hull( points = dataINLA, convex=-.05)
-# bndext <- inla.nonconvex.hull(points = dataINLA, convex=-.2)
-# 
-# # Use of inla.mesh.2d 
-# prmesh = inla.mesh.2d(loc = coords,
-#                       boundary = list(int = limit_zone,
-#                                       out = bndext),
-#                       max.edge = c(.5,2)*max.edge, 
-#                       cutoff = cutoffValue,
-#                       crs = crs(limit_zone)
-# )
-# 
-# 
-# px_mesh <- fm_mesh_2d_inla(
-#   loc = dataINLA,
-#   boundary = limit_zone,
-#   max.edge = c(.5,2)*max.edge,
-#   crs = st_crs(limit_zone)
-# )
-
-
-max.edge = diff(range(coords[,1]))/(3*5)
-
-bound.outer = diff(range(coords[,1]) ) / 3
-
-mesh3 = inla.mesh.2d(loc=coords,
+mesh3 = inla.mesh.2d(loc=coords,        # noeuds forcés aux points de mesure
                      max.edge = c(1,2)*max.edge,
                      offset=c(max.edge, bound.outer),
                      cutoff = max.edge/10)
@@ -74,39 +58,18 @@ ggplot() +
           size=1.7,alpha=0.5) 
 
 
-# ggplot() +
-#   geom_fm(data = px_mesh) +
-#   geom_sf(
-#     data = counts_df[counts_df$count > 0, ],
-#     aes(color = count),
-#     size = 1,
-#     pch = 4
-#   ) +
-#   theme_minimal()
-# # 
-# ggplot() +
-#   gg(mesh3) +
-#   gg( dataINLA ) +
-#   gg( dataINLA1,col=2 ) +
-#   coord_equal()
-# 
-# # 
-# mesh <- fm_mesh_2d_inla(loc=coords,boundary = limit_zone, max.edge = 50)
-# ggplot() +
-#   geom_fm(data = mesh)
-# 
+#3.Définir le champ gaussien Matérn----
 
-# Modelling inla
 matern <-
   INLA::inla.spde2.pcmatern(mesh3,
                             alpha = 2,
                             prior.sigma = c(10, 0.01),# P(sigma > 1) = 0.5
                             prior.range = c(500, 0.01)  # P(range < 100000 m) = 0.9
   )
+#4.Définir et ajuster le modèle----
 
 cmp <- activ ~ Intercept(1) +
   field(coordinates, model = matern)
-
 
 fitKO <- inlabru::bru(components = cmp,
                       data = dataINLA,
@@ -122,7 +85,9 @@ summary(fitKO)
 
 
 fi2plot = fitKO
-#diagnostic des postrior
+
+#5. Diagnostic de la distribution a posteriori----
+
 spde.range <- spde.posterior(fi2plot, "field", what = "range")
 spde.logvar <- spde.posterior(fi2plot, "field", what = "log.variance")
 
@@ -133,6 +98,7 @@ var.plot <- plot(spde.logvar)
 multiplot(range.plot, var.plot, int.plot)
 
 
+# 6. Prédictions sur la grille pxl-----
 
 predKO <- predict(
   fitKO,
@@ -143,6 +109,7 @@ predKO <- predict(
 )
 
 
+#7. Visualisation et sauvegarde-----
 
 p = tm_shape(rast(predKO) ) +
   tm_raster(c("mean"),
@@ -151,16 +118,19 @@ p = tm_shape(rast(predKO) ) +
 
 print(p)
 
+
 terra::writeRaster(
   rast(predKO)[["mean"]],
-  file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "predKOINLA.tif"),
+  file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "predKOINLA_geomask",d,".tif"),
   overwrite = TRUE
 )
 
 
-# Validation croisée-------------
+# 8.Validation croisée-----
+
 print("Validation croisée----------------")
 
+#initialisation 
 
 datacov$predINLAKO = NA
 
@@ -170,14 +140,13 @@ resuXval <-
             
             print(i)
             
-            # set to na to run a cross valid with inla
-            # Mettre en NA les individus pour la validation crois?e
+            # Mettre en NA les individus pour la validation croisée
             
             dataINLA$elt <- dataINLA$activ
             dataINLA$elt[ fold[[i]] ]  <- NA
             
             
-            
+            #calibration du modèle
            cmp <- elt ~ Intercept(1) +
               field(coordinates,
                     model = matern)
@@ -190,7 +159,7 @@ resuXval <-
                            verbose = FALSE)
             )
             
-            # find the prediction in the output....
+            # predition sur le groupe mis à NA
             fitted <- Myfit_KO$summary.fitted.values$mean[1:length(dataINLA$activ)] 
             
             mask <- is.na(dataINLA$elt)
@@ -200,6 +169,7 @@ resuXval <-
             fitted[mask] 
           }
 
-
+#Calcul des indicateurs de performance
 resuXvalTKO <-  Myeval(datacov$predINLAKO,   datacov[,name] )
 
+#================================================FIN DU SCRIPT====================================================#
