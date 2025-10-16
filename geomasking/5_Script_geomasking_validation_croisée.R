@@ -196,18 +196,21 @@ nsim=100 # for bayesian inla simulation
 NomsCoord1 <- c("x", "y")              
 NomsCoord2 <- c("x_moved", "y_moved") 
 crs_epsg   <- "EPSG:2154"
-d<-2500 # distance de geomasking
+# Séquence des distances
+d_seq <- seq(100, 2500, by = 100)
 
-#2.Preparation des données pour la spatialisation----
-##2.1. Importation des données----
-dtTB<-readRDS(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/geomasked",name,"_dist", d, ".rds")) # jeu de données ponctuelles avec les covariables
+# Pour collecter des sorties globales
+all_metrics_overall <- list()
+
+#Preparation des données pour la spatialisation----
+##Importation des données----
 
 rast_za <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rast_za.tif") # raster de la zone agricole
 
 cov_brt <- readRDS(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "_cov_brt.rds"))
 
 
-##2.2. Extraction des matrices de covariables pour les données ponctuelles----
+##Extraction des matrices de covariables pour les données ponctuelles
 
 chemin_cov<- "Y:/BDAT/traitement_donnees/MameGadiaga/data/Covariates_MAall"
 
@@ -217,124 +220,121 @@ l<- list.files(chemin_cov, pattern = ".tif$", full.names = TRUE)
 #stack des covariables
 st <- rast(l)
 
-#  Harmonisation / clés / contrôle coords
-dt <- dtTB %>%
-  dplyr::mutate(
-    id = dplyr::coalesce(as.numeric(ID), as.numeric(id_profil), dplyr::row_number()),
-    INSEE_COM = as.character(INSEE_COM)) %>%
-  dplyr::select(
-    id, INSEE_COM, source, annee = annee,
-    !! rlang::sym(name),    
-    x, y, x_moved, y_moved
-  ) %>%
-  dplyr::filter(
-    is.finite(x), is.finite(y),
-    is.finite(x_moved), is.finite(y_moved)
-  )
-
-#  Extraction des covariables pour les deux types de coords
-
-orig_df <- dt %>%
-  dplyr::select(id, INSEE_COM, source, annee, !! rlang::sym(name), dplyr::all_of(NomsCoord1)) %>%
-  extract_covs(NomsCoord1) #tableau avec les covariables pour les coordonnées originales
-
-mask_df <- dt %>%
-  dplyr::select(id, INSEE_COM, source, annee, !! rlang::sym(name), dplyr::all_of(NomsCoord2)) %>%
-  extract_covs(NomsCoord2) #tableau avec les covariables pour les coordonnéess geomasquées
-
-# garder exactement  individus (par paire) qui ont toutes les infos nécessaires (cible + covariables) sans NA.
-ok_orig <- stats::complete.cases(orig_df[, c(name, cov_brt), drop = FALSE])
-ok_mask <- stats::complete.cases(mask_df[, c(name, cov_brt), drop = FALSE])
-ok_both <- ok_orig & ok_mask
-
-orig_df <- orig_df[ok_both, , drop = FALSE]
-mask_df <- mask_df[ok_both, , drop = FALSE]
-
-stopifnot(nrow(orig_df) == nrow(mask_df))
-stopifnot(all(orig_df$id == mask_df$id))
-
-#  Garder uniquement les variables nécessaires pour la modélisation
-orig_df <- orig_df %>% dplyr::select(id, INSEE_COM, source, annee, !! rlang::sym(name),
-                                     dplyr::all_of(NomsCoord1), dplyr::all_of(cov_brt))
-mask_df <- mask_df %>% dplyr::select(id, INSEE_COM, source, annee, !! rlang::sym(name),
-                                     dplyr::all_of(NomsCoord2), dplyr::all_of(cov_brt))
-
-# création des folds pour la validation croisée
-set.seed(1001)
-k <- 10  
-folds <- caret::createFolds(orig_df$id, k = k, list = TRUE, returnTrain = FALSE)
-
-#Validation croisée 
-results_all <- list()
-
-for (fold_idx in seq_len(k)) {
-  message("Fold ", fold_idx, "/", k)
-  test_idx  <- folds[[fold_idx]]
-  train_idx <- unlist(folds[-fold_idx])
+# Harmonisation / clés / contrôle coords
+metrics_all_d <- foreach::foreach(
+  d = d_seq,
+  .packages = c("dplyr","tidyr","terra","sp","INLA","inlabru","ranger","mlr","tuneRanger","caret","tibble")
+) %do% {
   
-  data_train <- mask_df[train_idx, ]
-  data_test  <- orig_df[test_idx,  ]
+  message("\n===================== d = ", d, " m =====================")
   
-  # Randoom Forest (train : mask, test: orig)
+  #charger les données géomasquées pour cette distance 
+  dtTB_path <- paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/geomasked", name, "_dist", d, ".rds")
+  stopifnot(file.exists(dtTB_path))
+  dtTB <- readRDS(dtTB_path)
   
-  rf_res <- run_rf_geomask(
-    data_train = data_train,
-    data_test  = data_test,
-    cov_brt    = cov_brt,
-    name       = name,
-    ntree      = ntree,
-    kmax       = kmax,
-    NomsCoord_train = c("x_moved","y_moved"),
-    NomsCoord_test  = c("x","y")
-  )
-  
-  test_with_rf <- rf_res$detail
-  
-  #  KO INLA 
-  ko_pred <- run_inla_spde_core_geomask(
-    dataINLA = data_train,
-    data_test = data_test,
-    name = name,
-    type = "KO",
-    NomsCoord_train = c("x_moved","y_moved"),
-    NomsCoord_test  = c("x","y"),
-    crs_str = "epsg:2154"
-  )
-  
-  # KED INLA 
-  data_train_ked <- data_train
-  data_train_ked$pred <- rf_res$predCal   # dérive externe côté train
-  
-  ked_pred <- run_inla_spde_core_geomask(
-    dataINLA = data_train_ked,
-    data_test = test_with_rf,  # contient 'pred' côté test
-    name = name,
-    type = "KED",
-    NomsCoord_train = c("x_moved","y_moved"),
-    NomsCoord_test  = c("x","y"),
-    crs_str = "epsg:2154"
-  )
-  
-  results_all[[length(results_all)+1]] <- rf_res$detail %>%
+  #harmonisation / clés / coords
+  dt <- dtTB %>%
     dplyr::mutate(
-      approach = "Ponctuelle",
-      type_val = "Classique",
-      fold     = fold_idx,
-      predKO   = ko_pred,
-      predKED  = ked_pred
+      id = dplyr::coalesce(as.numeric(ID), as.numeric(id_profil), dplyr::row_number()),
+      INSEE_COM = as.character(INSEE_COM)
     ) %>%
-    dplyr::rename(obs = !! rlang::sym(name)) %>%
-    dplyr::select(id, approach, type_val, fold,
-                  obs, pred, predKO, predKED, INSEE_COM, x, y)
+    dplyr::select(id, INSEE_COM, source, annee = annee, !!rlang::sym(name), x, y, x_moved, y_moved) %>%
+    dplyr::filter(is.finite(x), is.finite(y), is.finite(x_moved), is.finite(y_moved))
+  
+  #xtraction covariables aux deux jeux de coords 
+  orig_df <- dt %>%
+    dplyr::select(id, INSEE_COM, source, annee, !!rlang::sym(name), dplyr::all_of(NomsCoord1)) %>%
+    extract_covs(NomsCoord1)
+  
+  mask_df <- dt %>%
+    dplyr::select(id, INSEE_COM, source, annee, !!rlang::sym(name), dplyr::all_of(NomsCoord2)) %>%
+    extract_covs(NomsCoord2)
+  
+  # filtre NA synchronisé 
+  ok_orig <- stats::complete.cases(orig_df[, c(name, cov_brt), drop = FALSE])
+  ok_mask <- stats::complete.cases(mask_df[, c(name, cov_brt), drop = FALSE])
+  ok_both <- ok_orig & ok_mask
+  orig_df <- orig_df[ok_both, , drop = FALSE]
+  mask_df <- mask_df[ok_both, , drop = FALSE]
+  
+  stopifnot(nrow(orig_df) == nrow(mask_df))
+  stopifnot(all(orig_df$id == mask_df$id))
+  
+  # garder colonnes utiles 
+  orig_df <- orig_df %>% dplyr::select(id, INSEE_COM, source, annee, !!rlang::sym(name),
+                                       dplyr::all_of(NomsCoord1), dplyr::all_of(cov_brt))
+  mask_df <- mask_df %>% dplyr::select(id, INSEE_COM, source, annee, !!rlang::sym(name),
+                                       dplyr::all_of(NomsCoord2), dplyr::all_of(cov_brt))
+  
+  # folds identiques
+  set.seed(1001)  # même folds par distance
+  folds <- caret::createFolds(orig_df$id, k = k, list = TRUE, returnTrain = FALSE)
+  
+  # CV 
+  results_all <- vector("list", length = k)
+  
+  for (fold_idx in seq_len(k)) {
+    message("  Fold ", fold_idx, "/", k)
+    test_idx  <- folds[[fold_idx]]
+    train_idx <- unlist(folds[-fold_idx])
+    
+    data_train <- mask_df[train_idx, ]
+    data_test  <- orig_df[test_idx,  ]
+    
+    rf_res <- run_rf_geomask(
+      data_train = data_train,
+      data_test  = data_test,
+      cov_brt    = cov_brt,
+      name       = name,
+      ntree      = ntree,
+      kmax       = kmax,
+      NomsCoord_train = c("x_moved","y_moved"),
+      NomsCoord_test  = c("x","y")
+    )
+    test_with_rf <- rf_res$detail
+    
+    ko_pred <- run_inla_spde_core_geomask(
+      dataINLA = data_train, data_test = data_test, name = name, type = "KO",
+      NomsCoord_train = c("x_moved","y_moved"), NomsCoord_test = c("x","y"),
+      crs_str = "epsg:2154"
+    )
+    
+    data_train_ked <- data_train; data_train_ked$pred <- rf_res$predCal
+    ked_pred <- run_inla_spde_core_geomask(
+      dataINLA = data_train_ked, data_test = test_with_rf, name = name, type = "KED",
+      NomsCoord_train = c("x_moved","y_moved"), NomsCoord_test = c("x","y"),
+      crs_str = "epsg:2154"
+    )
+    
+    results_all[[fold_idx]] <- rf_res$detail %>%
+      dplyr::mutate(approach = "Ponctuelle", type_val = "Classique", fold = fold_idx,
+                    predKO = ko_pred, predKED = ked_pred) %>%
+      dplyr::rename(obs = !!rlang::sym(name)) %>%
+      dplyr::select(id, approach, type_val, fold, obs, pred, predKO, predKED, INSEE_COM, x, y)
+  }
+  
+  resuXval_geomask <- dplyr::bind_rows(results_all)
+  
+  # métriques par distance
+  resuXvalQRF <-  Myeval(resuXval_geomask$pred,    resuXval_geomask$obs )
+  resuXvalKO  <-  Myeval(resuXval_geomask$predKO,  resuXval_geomask$obs )
+  resuXvalKED <-  Myeval(resuXval_geomask$predKED, resuXval_geomask$obs )
+  
+  metrics_overall <- dplyr::bind_rows(
+    dplyr::mutate(resuXvalQRF, method = "RF"),
+    dplyr::mutate(resuXvalKO,  method = "KO"),
+    dplyr::mutate(resuXvalKED, method = "KED")
+  ) %>% dplyr::mutate(dist = d, .before = 1)
+  
+  #sauvegardes fichiers de cette distance 
+  out_dir <- "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/"
+  saveRDS(resuXval_geomask, file = paste0(out_dir, "geomasked_Xval_", name, "_dist", d, ".rds"))
+  write.csv(metrics_overall, file = paste0(out_dir, "metrics_overall_", name, "_dist", d, ".csv"),
+            row.names = FALSE)
+  
+  metrics_overall  # valeur renvoyée pour cette distance
 }
-
-resuXval_geomask <- dplyr::bind_rows(results_all)
-
-resuXvalQRF <-  Myeval(resuXval_geomask$pred,   resuXval_geomask$obs )
-resuXvalKO  <-  Myeval(resuXval_geomask$predKO, resuXval_geomask$obs )
-resuXvalKED <-  Myeval(resuXval_geomask$predKED,resuXval_geomask$obs )
-
-saveRDS(resuXval_geomask, paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/geomasked_Xval_", name, "_dist", d, ".rds"))
 
 
 
