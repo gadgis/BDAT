@@ -45,7 +45,16 @@ summary((rast(pred)))
 
 print(p)
 
+<<<<<<< HEAD:KED_INLASPDE.R
 writeRaster(rast(pred)[["mean"]],file="Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKEDINLA.tif", overwrite = T)
+=======
+terra::writeRaster(
+  rast(pred)[["mean"]],
+  file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "predKEDINLA.tif"),
+  overwrite = TRUE
+)
+
+>>>>>>> nsa-sauv-fin-stage:carto/KED_INLASPDE.R
 
 # Validation croisée-------------
 print("Validation croisée----------------")
@@ -66,6 +75,7 @@ resuXval <-
             # set to na to run a cross valid with inla
             # Mettre en NA les individus pour la validation crois?e
             
+<<<<<<< HEAD:KED_INLASPDE.R
             # dataINLA$elt <- dataINLA$activ
             # dataINLA$elt[ fold[[i]] ]  <- NA
             # 
@@ -88,6 +98,9 @@ resuXval <-
             # mask <- is.na(dataINLA$elt)
             # 
             # datacov$predINLAKED[ fold[[i]] ] <-  fitted[mask] 
+=======
+
+>>>>>>> nsa-sauv-fin-stage:carto/KED_INLASPDE.R
             
             ### Avec le RF de la xva
             
@@ -124,6 +137,7 @@ resuXvalpredINLAKED <-  Myeval(datacov$predINLAKED,    datacov[,name]  )
 
 #Validation croisée  Méthode Nicolas----
 
+<<<<<<< HEAD:KED_INLASPDE.R
 #Validation croisee KED
 registerDoParallel(cores = kmax) 
 set.seed(123)
@@ -280,3 +294,5 @@ stopImplicitCluster()
 
 # Évaluation
 resuXvalINLAKED_aggr_com <- Myeval(datacov$predINLAKED_aggrcom, datacov[[name]])
+=======
+>>>>>>> nsa-sauv-fin-stage:carto/KED_INLASPDE.R

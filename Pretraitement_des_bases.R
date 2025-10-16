@@ -24,7 +24,7 @@ nomenclature<-read.csv("NomenclatureOCSGE.csv", sep=";", header=TRUE)
 
 ####Selection des colonnes d'intéret
 bdat<-BDAT %>%
-  select(annee,insee,x,y,x_commune,y_commune,bdatid)
+  dplyr::select(annee,insee,x,y,x_commune,y_commune,bdatid)
 
 ####Suppression dees lignes avec un X=NULL ou un Y=NULL
 bdat<-bdat %>%
@@ -268,18 +268,22 @@ igcs_agri_df<-igcs_agri_df %>%
 ###Filtrage des profils composite de RMQS---
 
 #les profils RMQS sont ceux dont typ_pr = C ou F
+RMQS<-igcs_agri_df%>%
+  filter( typ_pr_=="C" | typ_pr_=="F" ) 
 
 igcs_agri_df<-igcs_agri_df%>%
   filter( is.na(typ_pr_)) 
 
 saveRDS(igcs_agri_df, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_agri.rds")
+saveRDS(RMQS, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/RMQS.rds")
 
 
-###Harmonisation des données sur le pH----
+# ###Harmonisation des données sur le pH----
 
-igcs_agri_pH<-igcs_agri_df%>%
-  select(
+RMQS_pH<-RMQS%>%
+  dplyr::select(
     id_profil,
+    id_site,
     top,
     bottom,
     no_hrzn,
@@ -287,15 +291,146 @@ igcs_agri_pH<-igcs_agri_df%>%
     INSEE_COM,
     x,
     y,
-    pH
+    pH,
+    typ_pr_
   ) %>%
-  filter(!is.na(pH)) 
+  filter(!is.na(pH))
 
-# Harmonisation des horizons
+# # Harmonisation des horizons
+# 
+# 
+# ####selection des profils à horizons uniques
+# pf_uniq <- igcs_agri_pH %>% 
+#   filter(top < bottom) %>% 
+#   arrange(id_profil, top) %>% 
+#   group_by(id_profil) %>% 
+#   filter(n() == 1) %>%          
+#   ungroup()
+# 
+# ####selection des profiles à deux horizons dont la limite inférieur du premier
+# #horizon est comprise entre 30 et 35 cm
+# P2hrzn1_30_35 <- igcs_agri_pH %>% 
+#   filter(top < bottom) %>% 
+#   arrange(id_profil, top) %>% 
+#   group_by(id_profil) %>% 
+#   filter(n() == 2) %>%          
+#   ungroup() %>%
+#   filter(no_hrzn==1, bottom >= 30 & bottom <= 35)
+# 
+# 
+# ####selection des profils à deux horizons dont le premier horizon ne fait pas 30 cm 
+# 
+# pf_mp <- igcs_agri_pH %>% 
+#   filter(top < bottom) %>% 
+#   arrange(id_profil, top) %>% 
+#   group_by(id_profil) %>% 
+#   filter(n() == 2) %>%          
+#   ungroup()%>%
+#   anti_join(                                   # garde ce qui n’est PAS joint
+#     P2hrzn1_30_35 %>% 
+#       distinct(id_profil),                    # id uniques à exclure
+#     by = "id_profil"
+#   )
+# 
+# p_mp <- pf_mp %>% 
+#   mutate(
+#     thick = bottom - top          # épaisseur cm
+#   ) %>% 
+#   group_by(id_profil,annee,INSEE_COM,x,y) %>% 
+#   summarise(
+#     pH = round(weighted.mean(pH, thick, na.rm = TRUE),1)   # moyenne pondérée
+#   ) %>% 
+#   ungroup()
+# 
+# ####selection des profils dont les horizons sont supérieure ou égales à 3 et que le premier
+# #horizon est compris entre 30 et 35 cm
+# p3hrzn1_30_35 <- igcs_agri_pH %>% 
+#   filter(top < bottom) %>% 
+#   arrange(id_profil, top) %>% 
+#   group_by(id_profil) %>% 
+#   filter(n() >= 3) %>%          
+#   ungroup() %>%
+#   filter(no_hrzn==1, bottom >= 30 & bottom <= 35)
+# 
+# 
+# ####selection des profils à slpiner
+# spl_dfs <- igcs_agri_pH %>% 
+#   filter(top < bottom) %>% 
+#   arrange(id_profil, top) %>% 
+#   group_by(id_profil) %>% 
+#   filter(n() >= 3) %>%   #suppression des profils avec moins de 3 horizons       
+#   ungroup()%>%
+#   anti_join(                                   # garde ce qui n’est PAS joint
+#     p3hrzn1_30_35 %>% 
+#       distinct(id_profil),                    # id uniques à exclure
+#     by = "id_profil"
+#   )
+# 
+# 
+# 
+# # Nettoyage (top & bottom) 
+# 
+# 
+# spl_layers <- mpspline(
+#   obj = spl_dfs,
+#   var_name = "pH",
+#   d = c(0, 30),
+#   lam = 0.1  
+# )
+# 
+# 
+# 
+# # Étape 1: Créer un dataframe à partir de la liste
+# igcs_spline <- imap_dfr(spl_layers, ~ {
+#   
+#   tibble(
+#     # Identifiant et métadonnées de base
+#     id_profil = .x$id_profil,
+#     
+#     # Horizon standard (est_dcm)
+#     pH_000_030_cm = round(.x$est_dcm[["000_030_cm"]],1),
+#     
+#     # Erreurs (est_err)
+#     RMSE = .x$est_err[["RMSE"]],
+#     RMSE_IQR = .x$est_err[["RMSE_IQR"]])
+#   
+# })
+# 
+# # Étape 2: Fusionner avec les métadonnées supplémentaires (
+# 
+# igcs_spline <- igcs_spline %>%
+#   left_join(
+#     spl_dfs %>% distinct(id_profil, INSEE_COM, annee, x, y),
+#     by = "id_profil"
+#   ) %>%
+#   rename(pH = pH_000_030_cm) %>%
+#   select(id_profil, annee, INSEE_COM, x, y, pH)
+# 
+# ##haromisation des colonnes
+# pf_uniq <- pf_uniq %>%
+#   select(id_profil, annee,INSEE_COM, x, y, pH)
+# p_mp <- p_mp %>%
+#   select(id_profil, annee,INSEE_COM, x, y, pH)
+# 
+# p3hrzn1_30_35 <- p3hrzn1_30_35 %>%
+#   select(id_profil, annee,INSEE_COM, x, y, pH)
+# 
+# P2hrzn1_30_35 <- P2hrzn1_30_35 %>%
+#   select(id_profil, annee,INSEE_COM, x, y, pH)
+# 
+# igcs_final_pH<-rbind(p_mp, pf_uniq, p3hrzn1_30_35, igcs_spline, P2hrzn1_30_35)
+# 
+# igcs_final_pH <- igcs_final_pH %>%
+#   mutate(source="IGCS",
+#          INSEE_COM=as.numeric(INSEE_COM),
+#   )
+
+# Harmonisation des horizons RMQS
 
 
-####selection des profils à horizons uniques
-pf_uniq <- igcs_agri_pH %>% 
+####selection des profils à horizons uniques pour les sols peu profonds
+# on garde la valeur de l'horizon ou la couche
+pf_uniq <- RMQS_pH %>% 
   filter(top < bottom) %>% 
   arrange(id_profil, top) %>% 
   group_by(id_profil) %>% 
@@ -304,7 +439,7 @@ pf_uniq <- igcs_agri_pH %>%
 
 ####selection des profiles à deux horizons dont la limite inférieur du premier
 #horizon est comprise entre 30 et 35 cm
-P2hrzn1_30_35 <- igcs_agri_pH %>% 
+P2hrzn1_30_35 <- RMQS_pH %>% 
   filter(top < bottom) %>% 
   arrange(id_profil, top) %>% 
   group_by(id_profil) %>% 
@@ -315,7 +450,7 @@ P2hrzn1_30_35 <- igcs_agri_pH %>%
 
 ####selection des profils à deux horizons dont le premier horizon ne fait pas 30 cm 
 
-pf_mp <- igcs_agri_pH %>% 
+pf_mp <- RMQS_pH %>% 
   filter(top < bottom) %>% 
   arrange(id_profil, top) %>% 
   group_by(id_profil) %>% 
@@ -337,88 +472,25 @@ p_mp <- pf_mp %>%
   ) %>% 
   ungroup()
 
-####selection des profils dont les horizons sont supérieure ou égales à 3 et que le premier
-#horizon est compris entre 30 et 35 cm
-p3hrzn1_30_35 <- igcs_agri_pH %>% 
-  filter(top < bottom) %>% 
-  arrange(id_profil, top) %>% 
-  group_by(id_profil) %>% 
-  filter(n() >= 3) %>%          
-  ungroup() %>%
-  filter(no_hrzn==1, bottom >= 30 & bottom <= 35)
-
-
-####selection des profils à slpiner
-spl_dfs <- igcs_agri_pH %>% 
-  filter(top < bottom) %>% 
-  arrange(id_profil, top) %>% 
-  group_by(id_profil) %>% 
-  filter(n() >= 3) %>%   #suppression des profils avec moins de 3 horizons       
-  ungroup()%>%
-  anti_join(                                   # garde ce qui n’est PAS joint
-    p3hrzn1_30_35 %>% 
-      distinct(id_profil),                    # id uniques à exclure
-    by = "id_profil"
-  )
-
-
-
-# Nettoyage (top & bottom) 
-
-
-spl_layers <- mpspline(
-  obj = spl_dfs,
-  var_name = "pH",
-  d = c(0, 30),
-  lam = 0.1  
-)
-
-
-
-# Étape 1: Créer un dataframe à partir de la liste
-igcs_spline <- imap_dfr(spl_layers, ~ {
-  
-  tibble(
-    # Identifiant et métadonnées de base
-    id_profil = .x$id_profil,
-    
-    # Horizon standard (est_dcm)
-    pH_000_030_cm = round(.x$est_dcm[["000_030_cm"]],1),
-    
-    # Erreurs (est_err)
-    RMSE = .x$est_err[["RMSE"]],
-    RMSE_IQR = .x$est_err[["RMSE_IQR"]])
-  
-})
-
-# Étape 2: Fusionner avec les métadonnées supplémentaires (
-
-igcs_spline <- igcs_spline %>%
-  left_join(
-    spl_dfs %>% distinct(id_profil, INSEE_COM, annee, x, y),
-    by = "id_profil"
-  ) %>%
-  rename(pH = pH_000_030_cm) %>%
-  select(id_profil, annee, INSEE_COM, x, y, pH)
-
-##haromisation des colonnes
+#hARMONISATION
 pf_uniq <- pf_uniq %>%
-  select(id_profil, annee,INSEE_COM, x, y, pH)
-p_mp <- p_mp %>%
-  select(id_profil, annee,INSEE_COM, x, y, pH)
+    select(id_profil, annee,INSEE_COM, x, y, pH)
+  p_mp <- p_mp %>%
+    select(id_profil, annee,INSEE_COM, x, y, pH)
 
-p3hrzn1_30_35 <- p3hrzn1_30_35 %>%
-  select(id_profil, annee,INSEE_COM, x, y, pH)
+  P2hrzn1_30_35 <- P2hrzn1_30_35 %>%
+    select(id_profil, annee,INSEE_COM, x, y, pH)
+  
+  RMQS_pH<-rbind(p_mp, pf_uniq, P2hrzn1_30_35)
+  
+  saveRDS(RMQS_pH, "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/RMQS_pH.rds")
+  # 
+  # igcs_final_pH <- igcs_final_pH %>%
+  #   mutate(source="IGCS",
+  #          INSEE_COM=as.numeric(INSEE_COM),
+  #   )
 
-P2hrzn1_30_35 <- P2hrzn1_30_35 %>%
-  select(id_profil, annee,INSEE_COM, x, y, pH)
 
-igcs_final_pH<-rbind(p_mp, pf_uniq, p3hrzn1_30_35, igcs_spline, P2hrzn1_30_35)
-
-igcs_final_pH <- igcs_final_pH %>%
-  mutate(source="IGCS",
-         INSEE_COM=as.numeric(INSEE_COM),
-  )
 #Création de la base finale----
 
 #BDAT

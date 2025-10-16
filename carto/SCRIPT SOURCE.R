@@ -79,7 +79,11 @@ Myeval <- function(x, y){
 
 ## Définition des variables ------
 
+<<<<<<< HEAD:Regressiongrigeage.R
 name="pH"
+=======
+name="arg"
+>>>>>>> nsa-sauv-fin-stage:carto/SCRIPT SOURCE.R
 kmax= 23 # pour la parallelisation, le nb de coeurs
 ntree = 350 # le nbre d'arbre de random forest
 nbOGC = 5 # le nombre de pseudo covariables oblique
@@ -91,32 +95,45 @@ nsim=100 # for bayesian inla simulation
 
 NomsCoord <- c("x","y")
 
-# 1 Preparation des données pour la spatialisation
-#Extraction des matrices de covariables pour les données ponctuelles----
+# reparation des données pour la spatialisation
+#1. Extraction des matrices de covariables pour les données ponctuelles----
 
 chemin_cov<- "Y:/BDAT/traitement_donnees/MameGadiaga/data/Covariates_MAall"
 
-##liste des fichiers de covariables----
+##2.liste des fichiers de covariables----
 l<- list.files(chemin_cov, pattern = ".tif$", full.names = TRUE)
 
 st <- rast(l)
 plot(st)
 
 rast_za <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rast_za.tif")
+<<<<<<< HEAD:Regressiongrigeage.R
 communes <- st_read("Y:/BDAT/traitement_donnees/MameGadiaga/prétraitement/Analyse/Codes_Mame/Donnees/COMMUNE.shp")
 
 rmqs<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/RMQS_pH.rds")
 df_vars <- read.csv("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/COV_RF.csv", sep = ";", stringsAsFactors = FALSE  )
 # 
 # writeRaster(st, file = "output/covariables.tiff" , overwrite = T)
+=======
+
+df_vars <- read.csv("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/COV_RF.csv", sep = ";", stringsAsFactors = FALSE  )
+
+>>>>>>> nsa-sauv-fin-stage:carto/SCRIPT SOURCE.R
 
 # prepare covar into a table from the stack r1
 gXY <- as.data.frame(st , xy=TRUE) %>%
   na.omit( )
 
+com <- st_read("Y:/BDAT/traitement_donnees/MameGadiaga/data/commune_53.shp") 
+centroides_communes <- st_centroid(com) %>% dplyr::select(INSEE_COM, X = X_CENTROID, Y = Y_CENTROID) %>% st_drop_geometry()
 
+datacov <- readRDS(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/donnees_ponctuelles", name, ".rds"))
+moyenne_covariable <- readRDS(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/moyenne_covariable", name, ".rds"))
 
+#Enlever le commentaire et exécuter les lignes suivantes si vous vouler utilisiser l'approche centroides
+# Changer la variable d'intérêt au besoin
 
+<<<<<<< HEAD:Regressiongrigeage.R
   dtTB <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/igcs_bdat.rds")
 
 
@@ -142,6 +159,23 @@ fold = createFolds(y = datacov$id, k = k)
 
 
 
+=======
+# y_agg<-datacov %>%
+#   group_by(INSEE_COM) %>%
+#   summarise(arg = mean(arg, na.rm = TRUE)) %>%
+#   ungroup()
+# 
+# datacov<-moyenne_covariable %>%
+#   left_join(y_agg, by = "INSEE_COM") %>%
+#   left_join(centroides_communes, by = "INSEE_COM")%>%
+#   rename(x=X, y=Y)
+# 
+# 
+# datacov$id<- 1:nrow(datacov)
+
+fold = createFolds(y = datacov$id, k = k)
+
+>>>>>>> nsa-sauv-fin-stage:carto/SCRIPT SOURCE.R
 # 3 Modélisation par RF -----
 
 colnames(datacov)
@@ -156,15 +190,23 @@ resuXvalQRF
 resuXvalRF_commune
 resuXvalRF_aggrcom
 
+<<<<<<< HEAD:Regressiongrigeage.R
 saveRDS(resuXvalQRF, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_qrf.rds")
 saveRDS(resuXvalRF_commune, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_qrf_N.rds")
 saveRDS(resuXvalRF_aggrcom, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_qrf_L.rds")
+=======
+
+>>>>>>> nsa-sauv-fin-stage:carto/SCRIPT SOURCE.R
 # 2 krigeage ordinaire --------
-# https://inlabru-org.github.io/inlabru/articles/random_fields_2d.html
+#https://inlabru-org.github.io/inlabru/articles/random_fields_2d.html
 
 # prepare sp data for inlabru
 
+<<<<<<< HEAD:Regressiongrigeage.R
 dataINLA <- datacov[,c(NomsCoord,name,"predRF","predRF_aggr","predRF_aggrcom","INSEE_COM")]
+=======
+dataINLA <- datacov[,c(NomsCoord,name,"predRF")]
+>>>>>>> nsa-sauv-fin-stage:carto/SCRIPT SOURCE.R
 dataINLA$activ <- dataINLA[,name]
 coords <- datacov[,NomsCoord]
 
@@ -182,7 +224,8 @@ names(centroides_communes) <- c("x", "y", "INSEE_COM")
 
 # creation d'un tableau avec les prédictions random forest
 
-r <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pHqrf.tif")
+r <- rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "qrf.tif"))
+
 
 dataINLA$qrf <-  terra::extract(  r , vect(dataINLA)  )$QRF_Median
 
@@ -196,14 +239,15 @@ saveRDS(resuXvalTKO, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/me
 saveRDS(resuXvalINLAKO_aggr, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KO_N.rds")
 saveRDS(resuXvalINLAKO_aggr_com, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KO_L.rds")
 
-# 4 Krigeage avec dérive externe -------------
 
+# 4 Krigeage avec dérive externe -------------
 
 source("Y:/BDAT/traitement_donnees/MameGadiaga/Codes R/KED_INLASPDE.R")
 resuXvalpredINLAKED
 resuXvalINLAKED_aggr
 resuXvalINLAKED_aggr_com
 
+<<<<<<< HEAD:Regressiongrigeage.R
 saveRDS(resuXvalpredINLAKED, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KED.rds")
 saveRDS(resuXvalINLAKED_aggr, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KED_N.rds")
 saveRDS(resuXvalINLAKED_aggr_com, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrique_KED_L.rds")
@@ -246,8 +290,12 @@ print(results)
   
   
 ## Modelisation et spatilisation
+=======
+>>>>>>> nsa-sauv-fin-stage:carto/SCRIPT SOURCE.R
 
+##9. Application des mask----
 
+<<<<<<< HEAD:Regressiongrigeage.R
 
 # 5 Synthèse -----
 
@@ -281,6 +329,11 @@ rs <- readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metriquexval_poi
 qrf =   rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pHqrf.tif")
 koINLA =   rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKOINLA.tif")
 kedINLA =   rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKEDINLA.tif")
+=======
+qrf =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"qrf.tif"))
+koINLA =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKOINLA.tif"))
+kedINLA =   rast(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKEDINLA.tif"))
+>>>>>>> nsa-sauv-fin-stage:carto/SCRIPT SOURCE.R
 
 qrf = terra::resample(qrf,kedINLA)
 koINLA = terra::resample(koINLA,kedINLA)
@@ -301,9 +354,17 @@ qrf_agri = mask(qrf, rast_za)
 koINLA_agri = mask(koINLA, rast_za)
 kedINLA_agri = mask(kedINLA, rast_za)
 
+<<<<<<< HEAD:Regressiongrigeage.R
 writeRaster(qrf_agri, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/pHqrf_final.tif", overwrite = T)
 writeRaster(koINLA_agri, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKOINLA_final.tif", overwrite = T)
 writeRaster(kedINLA_agri, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/predKEDINLA_final.tif", overwrite = T)
+=======
+# 10. Sauvegarde des rasters finaux-----
+
+writeRaster(qrf_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"qrf_final_cent.tif"), overwrite = TRUE)
+writeRaster(koINLA_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKOINLA_final_cent.tif"), overwrite = TRUE)
+writeRaster(kedINLA_agri, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"predKEDINLA_final_cent.tif"), overwrite = TRUE)
+>>>>>>> nsa-sauv-fin-stage:carto/SCRIPT SOURCE.R
 
 predstack <- c(koINLA_agri,qrf_agri,kedINLA_agri)
 names(predstack) <- c("Krigeage Ordi. INLA","QRF","KED-INLA")
@@ -324,6 +385,7 @@ tm_shape(predstack) +
         item.na.space = .51, 
         title.align = "Carbone")
   )
+<<<<<<< HEAD:Regressiongrigeage.R
 
 # tmap_mode("view")
 # tm_shape(predstack[[3]]) + tm_raster(style="quantile" , n=8)
@@ -424,3 +486,5 @@ print(resuvalex)
 saveRDS(resuvalex, file = "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/results_vext_points.rds")
 
 
+=======
+>>>>>>> nsa-sauv-fin-stage:carto/SCRIPT SOURCE.R

@@ -4,9 +4,9 @@
 ### A CHANGER SI CHANGE NB DE COVARIABLES
 
 X = datacov[,idcovs]                 # X: variables indépendantes -> covariables
-Y = datacov[,idvar]                  # Y: Variable cible (target variable, outcome) -> ETM
+Y = datacov[[idvar]]                  # Y: Variable cible (target variable, outcome) -> ETM
 
-taille = ncol(datacov)-3
+taille = ncol(X)
 #Tune du mtry
 # bestmtry = tuneRF(X,Y,                            #tune du RF pour déterminer le meilleur mtry
 #                   stepFactor = 1.3,
@@ -24,9 +24,9 @@ library(mlr)
 
 
 
-#Boruta
+# #Boruta
 result_brt = Boruta(X, Y,                         #classification de l'importance des covariables par boruta
-                    mtry = taille ,
+                    mtry = min(taille, floor(sqrt(taille))) ,
                     min.node.size = 3 ,
                     ntree = ntree)
 
@@ -38,13 +38,17 @@ cov_brt = getSelectedAttributes(result_brt)       #sélection des covariables co
 result_brt_approche = TentativeRoughFix(result_brt)#résultats en forçant les indécis
 cov_brt = getSelectedAttributes((result_brt_approche))      #sélection du nouvel ensemble
 
-classement_brt = Stats_brt %>% 
+classement_brt = Stats_brt %>%
   arrange(desc(medianImp))                        #classe les covariables selon la valeur de la médiane
 
-classement_brt_approche = attStats(result_brt_approche) %>% 
+classement_brt_approche = attStats(result_brt_approche) %>%
   arrange(desc(medianImp))                        #pareil pour les covariables plus complètes
 
-classement_brt 
+# classement_brt 
+saveRDS(cov_brt, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "_cov_brt.rds"))
+
+#sauvegarde des covariables sélectionnées
+#cov_brt<-readRDS("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"_cov_brt.rds")
 
 #Création du tableau des covariables séléctionnées
 
@@ -70,35 +74,76 @@ res$recommended.pars$min.node.size
 
 
 
+# fomula.ranger <- as.formula(paste0(name,"~."))
+# QRF_Mod.G <- ranger(formula = fomula.ranger ,
+#                     data = datacov_shrt,
+#                     num.trees = ntree,
+#                     min.node.size = res$recommended.pars$min.node.size ,
+#                     quantreg = TRUE,
+#                     max.depth = 15, 
+#                     mtry=res$recommended.pars$mtry ,
+#                     importance="permutation", 
+#                     scale.permutation.importance = TRUE, #division par l'écart-type de la variable (mise des permutations entre 0 et 1)
+#                     keep.inbag = F)
+
 fomula.ranger <- as.formula(paste0(name,"~."))
-QRF_Mod.G <- ranger(formula = fomula.ranger ,
+RF_Mod.G <- ranger(formula = fomula.ranger ,
                     data = datacov_shrt,
                     num.trees = ntree,
-                    min.node.size = res$recommended.pars$mtry ,
-                    quantreg = TRUE,
+                    min.node.size = res$recommended.pars$min.node.size ,
+                    quantreg = F,
                     max.depth = 15, 
                     mtry=res$recommended.pars$mtry ,
                     importance="permutation", 
                     scale.permutation.importance = TRUE, #division par l'écart-type de la variable (mise des permutations entre 0 et 1)
                     keep.inbag = F)
-
 #Variable importance
-Imp_QRF <- data.frame(QRF_Mod.G$variable.importance)
-Imp_QRF$Vars <- row.names(Imp_QRF)
-Imp_QRF <- Imp_QRF[order(Imp_QRF$QRF_Mod.G.variable.importance,decreasing = T),]
+Imp_RF <- data.frame(RF_Mod.G$variable.importance)
+Imp_RF$Vars <- row.names(Imp_RF)
+Imp_RF <- Imp_RF[order(Imp_RF$RF_Mod.G.variable.importance,decreasing = T),]
 
-varimp <- ggplot(Imp_QRF, 
-       aes(x=reorder(Vars, QRF_Mod.G.variable.importance),
-           y=QRF_Mod.G.variable.importance #,  color=as.factor(var_categ)
-       )
+
+Imp_RF <- Imp_RF %>%
+  left_join(df_vars, by = "Vars")
+
+saveRDS(Imp_RF, file=paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/",name,"_Imp_RF.rds"))
+
+Imp_RF <- Imp_RF %>%
+  rename(importance = RF_Mod.G.variable.importance)
+
+Imp_RF$label <- iconv(Imp_RF$label, from = "", to = "UTF-8")
+
+Imp_RF_top10 <- Imp_RF %>%
+  arrange(desc(importance)) %>%
+  slice(1:10)
+
+varimp <- ggplot(Imp_RF_top10, 
+                 aes(x = reorder(label, importance), 
+                     y = importance,
+                     color = var_group)
 ) + 
-  geom_point() +
-  geom_segment(aes(x=Vars,xend=Vars,y=0,yend=QRF_Mod.G.variable.importance)) +
-  scale_color_discrete(name="Variable Group") +
-  ylab("IncNodePurity") +
-  xlab("Variable Name") +
-  ggtitle(name)+
-  coord_flip()
+  geom_point(size = 1.5) +
+  geom_segment(aes(x = label, xend = label, y = 0, yend = importance)) +
+  scale_color_manual(
+    name = "Groupe de variables",
+    values = c(
+      "Topographie" = "grey50",
+      "Climat" = "#1f77b4",
+      "Vegetation" = "#2ca02c",
+      "Sol" = "#8c564b",
+      "Lithologie"= "#d62728",
+      "Radiometrie" = "#9467bd",
+      "Occupation_Sol" = "#ffdf00" )) +
+  ylab("Importance (IncNodePurity)") +
+  xlab("Variables") +
+  ggtitle(paste("Dix premières variables importantes -",name)) +
+  coord_flip() +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.y = element_text(size = 10),
+    legend.position = "bottom"
+  )
 
 print(varimp)
 
@@ -113,25 +158,28 @@ testD <- gXY %>%
 
 
 
-QRF_Median <- predict(QRF_Mod.G,
+# QRF_Median <- predict(QRF_Mod.G,
+#                       testD,
+#                       type = "quantiles",
+#                       quantiles =  c(0.05,0.5,0.95),
+#                       num.threads = kmax )$predictions
+
+QRF_Median2 <- predict(RF_Mod.G,
                       testD,
-                      type = "quantiles",
-                      quantiles =  c(0.05,0.5,0.95),
                       num.threads = kmax )$predictions
-
-
 
 QRF_Median50 <- bind_cols(gXY %>%
                             filter_at(vars(cov_brt[-1]),
                                       all_vars(!is.na(.))
                                       ) %>%
                             dplyr::select(x,y)     ,
-                          QRF_Median = QRF_Median[,1])
+                          QRF_Median = QRF_Median2)
 
 r <- rast(QRF_Median50, type="xyz")
 
 
-terra::writeRaster(r,file=paste0("output/",name,"qrf.tif"),overwrite=TRUE)
+terra::writeRaster(r, file = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "qrf.tif"), overwrite = TRUE)
+
 
 # k fold -------------
 
@@ -140,40 +188,36 @@ print("Validation croisée----------------")
 datacov$predRF <- NA
 
 
-resuXval <- 
+resuXval <-
   foreach(i = 1:k,
           .errorhandling='pass' ) %do% {
-            
+
             print(i)
-            
+
             # collecter les # des lignes (gérer les doublons)
             nblignes = which( datacov$id %in% datacov$id[ fold[[i]] ] )
-            
-            QRF_Mod.G <- ranger(formula = fomula.ranger ,
+
+            RF_Mod.G <- ranger(formula = fomula.ranger ,
                                 data = datacov_shrt[-nblignes  , ],
                                 num.trees = ntree,
                                 mtry=res$recommended.pars$mtry ,
-                                min.node.size = res$recommended.pars$mtry ,
-                                
-                                quantreg = TRUE,
-                                max.depth = 15, 
-                                importance="permutation", 
+                                min.node.size = res$recommended.pars$min.node.size ,
+
+                                quantreg = FALSE,
+                                max.depth = 15,
+                                importance="permutation",
                                 scale.permutation.importance = FALSE, #division par l'écart-type de la variable (mise des permutations entre 0 et 1)
                                 keep.inbag = F)
-            
-            
-            datacov$predRF[ nblignes ] <- predict(QRF_Mod.G,
+
+
+            datacov$predRF[ nblignes ] <- predict(RF_Mod.G,
                                                     datacov_shrt[ nblignes , ],
-                                                    type = "quantiles",
-                                                    quantiles =  c(0.5),
                                                     num.threads = kmax )$prediction
-            
-            
+
+
 
           }
 
 
 resuXvalQRF <-  Myeval(datacov$predRF,   datacov[,name] )
-
-
 
