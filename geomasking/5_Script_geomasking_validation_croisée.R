@@ -134,8 +134,13 @@ run_rf_geomask <- function(data_train, data_test, cov_brt, name, ntree, kmax,
   test_out$pred <- preds
   
   eval <- Myeval(preds, test_out[[name]]) %>% dplyr::mutate(method = "RF_PC")
-  list(predCal = predCal, evaluation = eval,
-       detail  = test_out[, c("id", name, "INSEE_COM", NomsCoord_test, "pred")])
+  list(
+    rf_model   = rf_model,
+    best_pars  = res_tune$recommended.pars,
+    predCal    = predCal,
+    evaluation = eval,
+    detail     = test_out[, c("id", name, "INSEE_COM", NomsCoord_test, "pred")]
+  )
 }
 
 ##Fonction pour la calibration de KO et KED----
@@ -196,16 +201,18 @@ nsim=100 # for bayesian inla simulation
 NomsCoord1 <- c("x", "y")              
 NomsCoord2 <- c("x_moved", "y_moved") 
 crs_epsg   <- "EPSG:2154"
+out_dir <- "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/"
+predict_script <- "geomasking/geomasking_mapping.R" 
+
 # Séquence des distances
 d_seq <- seq(100, 2500, by = 100)
-
 
 #Preparation des données pour la spatialisation----
 ##Importation des données----
 
-rast_za <- rast("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/rast_za.tif") # raster de la zone agricole
+rast_za <- rast(out_dir,"rast_za.tif") # raster de la zone agricole
 
-cov_brt <- readRDS(paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/", name, "_cov_brt.rds"))
+cov_brt <- readRDS(paste0(out_dir, name, "_cov_brt.rds"))
 
 
 ##Extraction des matrices de covariables pour les données ponctuelles
@@ -218,6 +225,9 @@ l<- list.files(chemin_cov, pattern = ".tif$", full.names = TRUE)
 #stack des covariables
 st <- rast(l)
 
+gXY <- as.data.frame(st , xy=TRUE) %>%
+  na.omit( )
+
 # Harmonisation / clés / contrôle coords
 metrics_all_d <- foreach::foreach(
   d = d_seq,
@@ -227,7 +237,7 @@ metrics_all_d <- foreach::foreach(
   message("\n===================== d = ", d, " m =====================")
   
   #charger les données géomasquées pour cette distance 
-  dtTB_path <- paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/geomasked", name, "_dist", d, ".rds")
+  dtTB_path <- paste0(out_dir,"geomasked", name, "_dist", d, ".rds")
   stopifnot(file.exists(dtTB_path))
   dtTB <- readRDS(dtTB_path)
   
@@ -325,21 +335,31 @@ metrics_all_d <- foreach::foreach(
     dplyr::mutate(resuXvalKED, method = "KED")
   ) %>% dplyr::mutate(dist = d, .before = 1)
   
-  #sauvegardes fichiers de cette distance 
-  out_dir <- "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/"
+  #sauvegardes fichiers de cette distance
   saveRDS(resuXval_geomask, file = paste0(out_dir, "geomasked_Xval_", name, "_dist", d, ".rds"))
   write.csv(metrics_overall, file = paste0(out_dir, "metrics_overall_", name, "_dist", d, ".csv"),
             row.names = FALSE)
   
   metrics_overall  # valeur renvoyée pour cette distance
+  
+  rf_fit <- run_rf_geomask(
+    data_train = mask_df,
+    data_test  = mask_df[0, ],
+    cov_brt    = cov_brt,                  
+    name       = name,
+    ntree      = ntree,
+    kmax       = kmax,
+    NomsCoord_train = c("x_moved","y_moved"),
+    NomsCoord_test  = c("x","y")
+  )
+  
+  rf_model <- rf_fit$rf_model  
+  best_pars <- rf_fit$best_pars
+  
+  source(predict_script, local = TRUE)
 }
 
 metrics_all <- dplyr::bind_rows(metrics_all_d)
-
-writexl::write_xlsx(
-  metrics_all,
-  path = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrics_all_distances_", name, ".xlsx")
-)
 
 
 metrics_long <- metrics_all %>%
@@ -357,7 +377,7 @@ p_line <- ggplot(metrics_long, aes(x = dist, y = value, group = 1)) +
   geom_point(size = 1) +
   facet_grid(metric ~ method, scales = "free_y") +
   labs(x = "Distance de géomasking (m)", y = "Valeur de l'indicateur",
-       title = paste0("Evolution des indicateurs en fontionde la distance selon les modèles pour le ", name)) +
+       title = paste0("Evolution des indicateurs en fontion de la distance selon les modèles pour le ", name)) +
   theme_minimal(base_size = 12) +
   theme(strip.text = element_text(face = "bold"))
 print(p_line)

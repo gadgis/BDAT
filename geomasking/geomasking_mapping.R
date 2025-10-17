@@ -24,20 +24,7 @@
 # ============================================================
 
 
-# RANDOM FOREST : fit sur mask_df, prédiction sur gXY ----------
-
-rf_fit <- run_rf_geomask(
-  data_train = mask_df,
-  data_test  = mask_df[0, ],
-  cov_brt    = cov_brt,                  
-  name       = name,
-  ntree      = ntree,
-  kmax       = kmax,
-  NomsCoord_train = c("x_moved","y_moved"),
-  NomsCoord_test  = c("x","y")
-)
-
-rf_model <- rf_fit$rf_model  
+# RANDOM FOREST : fit sur mask_df, prédiction sur gXY 
 
 # prédiction sur la grille 
 testD <- gXY %>%
