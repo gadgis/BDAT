@@ -188,7 +188,7 @@ run_inla_spde_core_geomask <- function(dataINLA, data_test, name,
 
 # 1. Définition des variables ------
 
-name="pH" # changer la variable d'intérêt au besoin 
+name="arg" # changer la variable d'intérêt au besoin 
 kmax= 23 # pour la parallelisation, le nb de coeurs
 ntree = 350 # le nbre d'arbre de random forest
 k=10 # pour la validation croisée
@@ -199,8 +199,6 @@ crs_epsg   <- "EPSG:2154"
 # Séquence des distances
 d_seq <- seq(100, 2500, by = 100)
 
-# Pour collecter des sorties globales
-all_metrics_overall <- list()
 
 #Preparation des données pour la spatialisation----
 ##Importation des données----
@@ -336,9 +334,33 @@ metrics_all_d <- foreach::foreach(
   metrics_overall  # valeur renvoyée pour cette distance
 }
 
+metrics_all <- dplyr::bind_rows(metrics_all_d)
+
+writexl::write_xlsx(
+  metrics_all,
+  path = paste0("Y:/BDAT/traitement_donnees/MameGadiaga/resultats/metrics_all_distances_", name, ".xlsx")
+)
 
 
+metrics_long <- metrics_all %>%
+  dplyr::select(dist, method, NSE, CCC, REQM) %>%
+  tidyr::pivot_longer(cols = c(NSE, CCC, REQM),
+                      names_to = "metric", values_to = "value") %>%
+  dplyr::mutate(
+    method = factor(method, levels = c("RF","KO","KED")),
+    metric = factor(metric, levels = c("NSE","CCC","REQM")),
+    dist   = as.numeric(dist)
+  )
 
+p_line <- ggplot(metrics_long, aes(x = dist, y = value, group = 1)) +
+  geom_line() +
+  geom_point(size = 1) +
+  facet_grid(metric ~ method, scales = "free_y") +
+  labs(x = "Distance de géomasking (m)", y = "Valeur de l'indicateur",
+       title = paste0("Evolution des indicateurs en fontionde la distance selon les modèles pour le ", name)) +
+  theme_minimal(base_size = 12) +
+  theme(strip.text = element_text(face = "bold"))
+print(p_line)
 
 
 #================================================FIN DU SCRIPT====================================================#
