@@ -14,7 +14,7 @@
 
 # Entrees :     Données ponctuelles de la BDAT et IGCS floutées sur les propriétés des sols
 
-# Sorties :     Carte des propriétés des sols sur la zone agricole
+# Sorties :     CIndicateurs de performance et des rasters pour chaque distance en fonction des modèles
 
 # Modification : 
 #===========================================================================================================#
@@ -111,7 +111,7 @@ run_rf_geomask <- function(data_train, data_test, cov_brt, name, ntree, kmax,
   
   rf_task <- mlr::makeRegrTask(data = data_train[, c(name, cov_brt)], target = name)
   res_tune <- tuneRanger::tuneRanger(rf_task, num.trees = ntree, iters = 10,
-                                     num.threads = kmax, show.info = FALSE)
+                                     num.threads = 60, show.info = FALSE)
   
   rf_model <- ranger::ranger(
     formula = stats::as.formula(paste0(name, " ~ .")),
@@ -202,22 +202,17 @@ NomsCoord1 <- c("x", "y")
 NomsCoord2 <- c("x_moved", "y_moved") 
 crs_epsg   <- "EPSG:2154"
 out_dir <- "Y:/BDAT/traitement_donnees/MameGadiaga/resultats/"
+chemin_cov<- "Y:/BDAT/traitement_donnees/MameGadiaga/data/Covariates_MAall"
 predict_script <- "geomasking/geomasking_mapping.R" 
-
-# Séquence des distances
 d_seq <- seq(100, 2500, by = 100)
 
-#Preparation des données pour la spatialisation----
-##Importation des données----
+#2. Preparation des données pour la spatialisation----
 
-rast_za <- rast(out_dir,"rast_za.tif") # raster de la zone agricole
+#Importation des données
+
+rast_za <- rast(paste0(out_dir,"rast_za.tif")) # raster de la zone agricole
 
 cov_brt <- readRDS(paste0(out_dir, name, "_cov_brt.rds"))
-
-
-##Extraction des matrices de covariables pour les données ponctuelles
-
-chemin_cov<- "Y:/BDAT/traitement_donnees/MameGadiaga/data/Covariates_MAall"
 
 #liste des fichiers de covariables
 l<- list.files(chemin_cov, pattern = ".tif$", full.names = TRUE)
@@ -225,10 +220,11 @@ l<- list.files(chemin_cov, pattern = ".tif$", full.names = TRUE)
 #stack des covariables
 st <- rast(l)
 
+#Définition de la grille de prédiction
 gXY <- as.data.frame(st , xy=TRUE) %>%
   na.omit( )
 
-# Harmonisation / clés / contrôle coords
+#3. Validation croisée pour chaque distance de géomasking -----
 metrics_all_d <- foreach::foreach(
   d = d_seq,
   .packages = c("dplyr","tidyr","terra","sp","INLA","inlabru","ranger","mlr","tuneRanger","caret","tibble")
@@ -241,7 +237,7 @@ metrics_all_d <- foreach::foreach(
   stopifnot(file.exists(dtTB_path))
   dtTB <- readRDS(dtTB_path)
   
-  #harmonisation / clés / coords
+  #harmonisation des données
   dt <- dtTB %>%
     dplyr::mutate(
       id = dplyr::coalesce(as.numeric(ID), as.numeric(id_profil), dplyr::row_number()),
@@ -250,7 +246,7 @@ metrics_all_d <- foreach::foreach(
     dplyr::select(id, INSEE_COM, source, annee = annee, !!rlang::sym(name), x, y, x_moved, y_moved) %>%
     dplyr::filter(is.finite(x), is.finite(y), is.finite(x_moved), is.finite(y_moved))
   
-  #xtraction covariables aux deux jeux de coords 
+  #Extraction covariables pour les deux jeux de données (orig et mask) 
   orig_df <- dt %>%
     dplyr::select(id, INSEE_COM, source, annee, !!rlang::sym(name), dplyr::all_of(NomsCoord1)) %>%
     extract_covs(NomsCoord1)
@@ -259,7 +255,7 @@ metrics_all_d <- foreach::foreach(
     dplyr::select(id, INSEE_COM, source, annee, !!rlang::sym(name), dplyr::all_of(NomsCoord2)) %>%
     extract_covs(NomsCoord2)
   
-  # filtre NA synchronisé 
+  # filtre NA synchronisé entre les deux jeux de données
   ok_orig <- stats::complete.cases(orig_df[, c(name, cov_brt), drop = FALSE])
   ok_mask <- stats::complete.cases(mask_df[, c(name, cov_brt), drop = FALSE])
   ok_both <- ok_orig & ok_mask
@@ -275,21 +271,27 @@ metrics_all_d <- foreach::foreach(
   mask_df <- mask_df %>% dplyr::select(id, INSEE_COM, source, annee, !!rlang::sym(name),
                                        dplyr::all_of(NomsCoord2), dplyr::all_of(cov_brt))
   
-  # folds identiques
+
+  # création de folds identiques
+  
   set.seed(1001)  # même folds par distance
   folds <- caret::createFolds(orig_df$id, k = k, list = TRUE, returnTrain = FALSE)
   
-  # CV 
+  # validation croisée (CV) pour chaque méthode
   results_all <- vector("list", length = k)
   
   for (fold_idx in seq_len(k)) {
     message("  Fold ", fold_idx, "/", k)
+    
+    #définit les folds d'entrainement et de test
     test_idx  <- folds[[fold_idx]]
     train_idx <- unlist(folds[-fold_idx])
     
+    # jeux de données d'entrainement et de test
     data_train <- mask_df[train_idx, ]
     data_test  <- orig_df[test_idx,  ]
     
+    # CV_Random Forest
     rf_res <- run_rf_geomask(
       data_train = data_train,
       data_test  = data_test,
@@ -302,6 +304,7 @@ metrics_all_d <- foreach::foreach(
     )
     test_with_rf <- rf_res$detail
     
+    # CV_Krigeage Ordinaire
     ko_pred <- run_inla_spde_core_geomask(
       dataINLA = data_train, data_test = data_test, name = name, type = "KO",
       NomsCoord_train = c("x_moved","y_moved"), NomsCoord_test = c("x","y"),
@@ -309,6 +312,8 @@ metrics_all_d <- foreach::foreach(
     )
     
     data_train_ked <- data_train; data_train_ked$pred <- rf_res$predCal
+    
+    # CV_Krigeage avec Dérive Externe
     ked_pred <- run_inla_spde_core_geomask(
       dataINLA = data_train_ked, data_test = test_with_rf, name = name, type = "KED",
       NomsCoord_train = c("x_moved","y_moved"), NomsCoord_test = c("x","y"),
@@ -340,28 +345,15 @@ metrics_all_d <- foreach::foreach(
   write.csv(metrics_overall, file = paste0(out_dir, "metrics_overall_", name, "_dist", d, ".csv"),
             row.names = FALSE)
   
-  metrics_overall  # valeur renvoyée pour cette distance
   
-  rf_fit <- run_rf_geomask(
-    data_train = mask_df,
-    data_test  = mask_df[0, ],
-    cov_brt    = cov_brt,                  
-    name       = name,
-    ntree      = ntree,
-    kmax       = kmax,
-    NomsCoord_train = c("x_moved","y_moved"),
-    NomsCoord_test  = c("x","y")
-  )
+  source(predict_script, local = TRUE) # cartographie pour chaque distance 
   
-  rf_model <- rf_fit$rf_model  
-  best_pars <- rf_fit$best_pars
-  
-  source(predict_script, local = TRUE)
+  metrics_overall
 }
 
 metrics_all <- dplyr::bind_rows(metrics_all_d)
 
-
+# 4.Visualisation des résultats -----
 metrics_long <- metrics_all %>%
   dplyr::select(dist, method, NSE, CCC, REQM) %>%
   tidyr::pivot_longer(cols = c(NSE, CCC, REQM),
