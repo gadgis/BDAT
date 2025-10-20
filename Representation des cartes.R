@@ -70,8 +70,8 @@ raster_to_df <- function(r, modele, type_approche, prop_name = "val") {
 plot_raster_facets <- function(
     df,
     fill_col,                     # la colonne à cartographier 
-    type_col   = "type",            # colonne des lignes de facet 
-    model_col  = "modèle",          # colonne des colonnes de facet
+    type_col   = type,            # colonne des lignes de facet 
+    model_col  = modèle,          # colonne des colonnes de facet
     # paramètres pour continu
     palette_cont   = NULL,        # couleurs_argile
     cuts           = NULL,        # valeurs_coupures (pour values = rescale(cuts))
@@ -289,7 +289,7 @@ p_ph <- plot_raster_facets(
   fill_col     = val,
   palette_cont = palette_ph,
   limits_cont  = ph_limits,
-  fill_label   = "pH (H₂O)"
+  fill_label   = "pH"
 )
 
 
