@@ -56,6 +56,8 @@ Ce test consiste à diminuer de façon progressive la taille du jeu de données 
 
 
 ### 5. Expérience de Geomasking
+Dans le but de maintenir la confidentialité des données, ce test est effectué et il consiste à flouter les coordonnées des points originaux en les déplaçant de façon aléatoire d’une distance **d** variable. Ainsi les modèles sont calibrés sur la bases des coordonnées geo-masquées et les prédictions se font sur les points orignaux afin d’évaluer la performance des modèles face à ce floutage de coordonnées.
+Le script [52_geomasking.R]( 52_geomasking.R) permet de calculer pour chaque distance **d** les nouvelles coordonnées. Le script [5_Script_geomasking_validation_croisée.R]( 5_Script_geomasking_validation_croisée.R) permet d’implémenter le processus de la validation croisée pour chaque distance **d**, de générer les rasters prédits sur la zone agricole pour chaque modèle grâce au script [52_geomasking_mapping.R]( 52_geomasking_mapping.R) chargé dans la boucle lors de la validation croisée. Le script [53_carto_geomasking.R]( 53_carto_geomasking.R) permet de produire des cartes pour chaque modèles en fonction de la distance **d** de déplacement des coordonnées.
 
 
 
