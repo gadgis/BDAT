@@ -24,24 +24,31 @@ La figure ci-après montre la procédure de validation
   <img src="dégradation/schema_degradation.png" width="500" alt="Schéma de dégradation">
 </p>
 
-Les blocs suivant décrivent les étapes scuccésives ayant perlis d'effectuer ce travail de l'extraction des données sols jusqu'à la visualisation des résultats.
+Les blocs suivant décrivent la chaine de traitementqs fait de l'extraction des données à la visualisation des résultats.
 
 ## Model workflow (R scripts)
 
-Cette partie....
+Cette partie montre l’organisation général de la chaine de traitement depuis la préparation des données jusqu’aux différents tests réalisés (Géo-masquage, Dégradation) en passant par la calibration des modèles et la cartographie des propriétés de sol.
 
 ### 1. Préparation des données sols
 
+C’est la première étape du travail et consiste à harmoniser les données pour obtenir une base de données uniforme et propre pour les traitements. Ainsi le script [1_preparation_des_donnees_sol.R]( 1_preparation_des_donnees_sol.R) nettoie et reprojette les coordonnées pour les données de la BDAT, vérifie les codes INSEE et garde les points dans la zone agricole. Pour les données IGCS, le script permet de les harmoniser à une épaisseur de 0–30 cm. En effet les données IGCS sont des profils avec des épaisseurs variables. Selon le type de profil rencontré, différentes méthodes (moyennes pondérées, splines quadratiques à aires égales) sont utilisées pour avoir l’information sur l’horizon 1 d’une épaisseur de 0-30 cm. Les types de profils suivants sont rencontrés : 
 
+  -	Profil avec un horizon unique dont l’épaisseur est supérieure ou égale à 30 cm, (1)
+  -	Profil avec deux horizons dont le premier horizon est compris entre 30 et 35 cm, (2)
+  -	Profil sur deux horizons dont le premier horizon n’excède pas 30 cm, (3)
+  -	Profil de trois horizons dont le premier horizon compris entre 30 et 35 cm, (4)
+  -	Profil de trois horizons ou plus dont le premier horizon n’excède pas 30 cm. (5)
 
+Pour les cas de figure (1), (2) et (4), la valeur de la propriété pour le premier horizon est retenue. Pour le cas (3), une moyenne pondérée est effectuée et pour le (5) des splines quadratiques à aires égales égale sont utilisées. Seules les données sur la zone agricole sont retenues et les deux bases sont fusionnées pour former le jeu de données d’entrée pour les modèles
 
 ### 2. Extraction des covariables
-
+Les covariables sont nécessaires pour implémenter le modèle de Random Forest dont les prédictions sont également utilisées comme dérive dans le Krigeage avec dérive externe. Ces covariables étant des rasters décrivant des valeurs continues comme catégorielles, le script [2_Extraction_matrice_de_covariables.R]( 2_Extraction_matrice_de_covariables.R) permet ainsi d’extraire en chaque point du jeu de données les valeurs des covariables correspondantes. Il permet également dans l’approche de désagrégation de calculer pour chaque commune, la valeur moyenne des covariables (mode ou moyenne selon la nature de la covariable) qui sont ensuite assignées aux centroïdes.
 
 ### 3. Calibration des modèles et cartographie
+Quelque soit l’approche utilisée (Données Ponctuelles ou Désagrégation) la façon de calibrer les modèles est la même. La différence réside au niveau des jeux de données d’entrée pour la calibration des modèles. Le script [31_Calibration_RF.R]( 31_Calibration_RF.R) permet de calibrer le modèle de Random Forest. Ce script sélectionne les covariables les plus importantes par Boruta puis calibre un modèle de Random Forest avec tuning des hyperparamètres et fait une validation croisée. Les scripts [32_Calibration_KO.R]( 32_Calibration_KO.R) et [33_Calibration_KED.R]( 33_Calibration_KED.R) permettent de calibrer respectivement les modèles de Krigeage Ordinaire et de Krigeage avec dérive externe dans un cadre Bayésien avec INLA SPDE (Approximation de Laplace imbriquée intégrée avec l'approche d'équation aux dérivées partielles stochastiques).
 
-
-
+ Ainsi pour la calibration des modèles, un champ spatial est modélisé grâce à SPDE et la création de ce champ passe par un maillage pour discrétiser le champ spatial et une définition des a priori. Ensuite les modèles sont définis puis ajustés à l’aide de inlabru et la prédiction peut enfin se faire sur une grille préalablement définie. Les modèles sont également évalués par une procédure de validation croisée.
 
 ### 4. Expérience de la dégradation de l'information spatiale
 
