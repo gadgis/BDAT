@@ -4,7 +4,8 @@
 # Institution : UMR Infos&Sols /GisSol/BDAT
 
 # Description : Script pour la prédiction des propriétés des sols en utilisant 
-#               la méthode Random Forest avec INLA SPDE 
+#               la méthode Random Forest. Il sélectionne les covariables les plus imporatantes par Boruta
+#               puis calibre un modèle de Random Forest avec tuning des hyperparamètres et fait une validation croisée.
 
 # Auteurs :     Mame Cheikh Gadiaga, Nicolas Saby
 
