@@ -24,31 +24,40 @@ La figure ci-après montre la procédure de validation
   <img src="dégradation/schema_degradation.png" width="500" alt="Schéma de dégradation">
 </p>
 
-Les blocs suivant décrivent les étapes scuccésives ayant perlis d'effectuer ce travail de l'extraction des données sols jusqu'à la visualisation des résultats.
+Les blocs suivant décrivent la chaine de traitementqs fait de l'extraction des données à la visualisation des résultats.
 
 ## Model workflow (R scripts)
 
-Cette partie....
+Cette partie montre l’organisation général de la chaine de traitement depuis la préparation des données jusqu’aux différents tests réalisés (Géo-masquage, Dégradation) en passant par la calibration des modèles et la cartographie des propriétés de sol.
 
 ### 1. Préparation des données sols
 
+C’est la première étape du travail et consiste à harmoniser les données pour obtenir une base de données uniforme et propre pour les traitements. Ainsi le script [1_preparation_des_donnees_sol.R]( 1_preparation_des_donnees_sol.R) nettoie et reprojette les coordonnées pour les données de la BDAT, vérifie les codes INSEE et garde les points dans la zone agricole. Pour les données IGCS, le script permet de les harmoniser à une épaisseur de 0–30 cm. En effet les données IGCS sont des profils avec des épaisseurs variables. Selon le type de profil rencontré, différentes méthodes (moyennes pondérées, splines quadratiques à aires égales) sont utilisées pour avoir l’information sur l’horizon 1 d’une épaisseur de 0-30 cm. Les types de profils suivants sont rencontrés : 
 
+  -	Profil avec un horizon unique dont l’épaisseur est supérieure ou égale à 30 cm, (1)
+  -	Profil avec deux horizons dont le premier horizon est compris entre 30 et 35 cm, (2)
+  -	Profil sur deux horizons dont le premier horizon n’excède pas 30 cm, (3)
+  -	Profil de trois horizons dont le premier horizon compris entre 30 et 35 cm, (4)
+  -	Profil de trois horizons ou plus dont le premier horizon n’excède pas 30 cm. (5)
 
+Pour les cas de figure (1), (2) et (4), la valeur de la propriété pour le premier horizon est retenue. Pour le cas (3), une moyenne pondérée est effectuée et pour le (5) des splines quadratiques à aires égales égale sont utilisées. Seules les données sur la zone agricole sont retenues et les deux bases sont fusionnées pour former le jeu de données d’entrée pour les modèles
 
 ### 2. Extraction des covariables
-
+Les covariables sont nécessaires pour implémenter le modèle de Random Forest dont les prédictions sont également utilisées comme dérive dans le Krigeage avec dérive externe. Ces covariables étant des rasters décrivant des valeurs continues comme catégorielles, le script [2_Extraction_matrice_de_covariables.R]( 2_Extraction_matrice_de_covariables.R) permet ainsi d’extraire en chaque point du jeu de données les valeurs des covariables correspondantes. Il permet également dans l’approche de désagrégation de calculer pour chaque commune, la valeur moyenne des covariables (mode ou moyenne selon la nature de la covariable) qui sont ensuite assignées aux centroïdes.
 
 ### 3. Calibration des modèles et cartographie
+Quelque soit l’approche utilisée (Données Ponctuelles ou Désagrégation) la façon de calibrer les modèles est la même. La différence réside au niveau des jeux de données d’entrée pour la calibration des modèles. Le script [31_Calibration_RF.R](carto/31_Calibration_RF.R) permet de calibrer le modèle de Random Forest. Ce script sélectionne les covariables les plus importantes par Boruta puis calibre un modèle de Random Forest avec tuning des hyperparamètres et fait une validation croisée. Les scripts [32_Calibration_KO.R](carto/32_Calibration_KO.R) et [33_Calibration_KED.R](carto/33_Calibration_KED.R) permettent de calibrer respectivement les modèles de Krigeage Ordinaire et de Krigeage avec dérive externe dans un cadre Bayésien avec INLA SPDE (Approximation de Laplace imbriquée intégrée avec l'approche d'équation aux dérivées partielles stochastiques).
 
+Ainsi pour la calibration des modèles, un champ spatial est modélisé grâce à SPDE et la création de ce champ passe par un maillage pour discrétiser le champ spatial et une définition des a priori. Ensuite les modèles sont définis puis ajustés à l’aide de inlabru et la prédiction peut enfin se faire sur une grille préalablement définie. Les modèles sont également évalués par une procédure de validation croisée.Ces scripts sont secondaires et sont à charger dans le script principal [3_Script_principal_cartographie.R](carto/3_Script_principal_cartographie.R).
 
+### 4. Test de la dégradation de l'information spatiale
 
-
-### 4. Expérience de la dégradation de l'information spatiale
-
-
+Ce test consiste à diminuer de façon progressive la taille du jeu de données de calibration, à calibrer les modèles avec ce jeu de données réduit afin d’évaluer l’influence de la densité d’échantillonnage sur la qualité des prédictions et la sensibilité des modèles utilisées face à une diminution de la densité d’échantillonnage du jeu de calibration. En d’autres termes, cela permet de savoir à quel point la quantité de données disponibles pour la calibration affecte les performances des modèles. Ce test est implémenter lors de la procédure de validation croisée [4_Script_CV_degradation.R](dégradation/4_Script_CV_degradation.R). Pour chaque taille d’échantillon du jeu de calibration et pour 30 répétitions, nous procédons ainsi : nous définissons d’abord 10 groupes pour les validations croisées spatiale et classique. Ensuite pour chaque itération, le jeu de calibration est échantillonné sur les k-1 groupes et la prédiction se fait sur le groupe restant. Enfin les indicateurs de qualité de prédiction sont calculés puis moyennés par taille d’échantillon et par type de validation croisée. Les scripts [41_fonction_RF.R](dégradation/41_fonction_RF.R) et [42_fonction_KO_KED.R](dégradation/42_fonction_KO_KED.R) permettent de calibrer les modèles lors de la validation croisée, d’automatiser le processus selon l’approche et le type de validation croisée. Le script [43_Graphique_degradation.R](dégradation/43_Graphique_degradation.R) permet de visualiser le résultat du test de dégradation.
 
 
 ### 5. Expérience de Geomasking
+Dans le but de maintenir la confidentialité des données, ce test est effectué et il consiste à flouter les coordonnées des points originaux en les déplaçant de façon aléatoire d’une distance **d** variable. Ainsi les modèles sont calibrés sur la bases des coordonnées geo-masquées et les prédictions se font sur les points orignaux afin d’évaluer la performance des modèles face à ce floutage de coordonnées.
+Le script [52_geomasking.R](geomasking/52_geomasking.R) permet de calculer pour chaque distance **d** les nouvelles coordonnées. Le script [5_Script_geomasking_validation_croisée.R](geomasking/5_Script_geomasking_validation_croisée.R) permet d’implémenter le processus de la validation croisée pour chaque distance **d**, de générer les rasters prédits sur la zone agricole pour chaque modèle grâce au script [52_geomasking_mapping.R](geomasking/52_geomasking_mapping.R) chargé dans la boucle lors de la validation croisée. Le script [53_carto_geomasking.R](geomasking/53_carto_geomasking.R) permet de produire des cartes pour chaque modèles en fonction de la distance **d** de déplacement des coordonnées.
 
 
 
